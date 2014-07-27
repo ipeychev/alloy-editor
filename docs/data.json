@@ -832,6 +832,40 @@
             "class": "CKEDITOR.tools"
         },
         {
+            "file": "src/core/tools.js",
+            "line": 41,
+            "description": "Extends an object with another one. Sets the constructor, prototype and superclass properties\nto support an inheritance strategy that can chain constructors and methods.\nStatic members will not be inherited.\nThis method should be called \"extend\", but CKEDITOR.tools already have another function with the\nsame name, which does something completely different.",
+            "itemtype": "method",
+            "name": "inherit",
+            "params": [
+                {
+                    "name": "child",
+                    "description": "The child object which should extend the parent.",
+                    "type": "Function"
+                },
+                {
+                    "name": "parent",
+                    "description": "The parent object from which the child should extend.",
+                    "type": "Function"
+                },
+                {
+                    "name": "overrides",
+                    "description": "Object with properties, which should be added to child's prototype.\nIf child's prototype already contains some property, it will be overwritten.",
+                    "type": "Object"
+                },
+                {
+                    "name": "staticProperties",
+                    "description": "Object with properties, which will be added as static\nproperties to the child object. If child already contains some of these properties, it will be\noverwritten.",
+                    "type": "Object"
+                }
+            ],
+            "return": {
+                "description": "The extended object.",
+                "type": "Object"
+            },
+            "class": "CKEDITOR.tools"
+        },
+        {
             "file": "src/core/uicore.js",
             "line": 20,
             "description": "Fired when user interacts somehow with the browser. This may be clicking with the mouse, pressing keyboard button,\nor touching screen. This even will be not fired after each interaction. It will be debounced. By default the timeout\nis 50ms. This value can be overwritten via {{#crossLink \"CKEDITOR.plugins.uicore/timeout:attribute\"}}{{/crossLink}}\nproperty of editor's configuration, like: editor.config.uicore.timeout = 100",

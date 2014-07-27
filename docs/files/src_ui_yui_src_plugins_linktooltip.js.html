@@ -477,6 +477,10 @@
                     }, editor.config.linktooltip);
 
                     tooltip = new Y.LinkTooltip(config).render();
+
+                    editor.on(&#x27;destroy&#x27;, function() {
+                        tooltip.destroy();
+                    });
                 });
             }
         }
