@@ -99,6 +99,8 @@ YUI.add('toolbar-styles', function(Y) {
 
                 nativeEvent = event.data.nativeEvent;
 
+                this.hide();
+
                 if (!selectionData.element && selectionData.region && !selectionEmpty) {
                     position = this._calculatePosition(selectionData, {
                         x: nativeEvent.pageX,
@@ -106,9 +108,6 @@ YUI.add('toolbar-styles', function(Y) {
                     });
 
                     this.showAtPoint(position.x, position.y, position.direction);
-
-                } else {
-                    this.hide();
                 }
             },
 
