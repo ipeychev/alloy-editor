@@ -57,6 +57,12 @@ YUI.add('toolbar-base', function(Y) {
             editor.on('editorInteraction', instance._onEditorInteraction, instance);
         },
 
+        /**
+         * Initializes the focusManager and listen to keyboard events
+         *
+         * @method syncUI
+         * @protected
+         */
         syncUI: function() {
             var buttonsContainer = this.get('buttonsContainer');
 
@@ -72,7 +78,7 @@ YUI.add('toolbar-base', function(Y) {
         },
 
         /**
-         * Check if toolbar ir currently focused. If not, put focus on it. If yes, 
+         * Check if toolbar is currently focused. If not, put focus on it. If yes,
          * retrieves focus to editor (works like 'ESC' button)
          *
          * @method focus
@@ -117,7 +123,7 @@ YUI.add('toolbar-base', function(Y) {
         },
 
         /**
-         * Check if toolbar ir currently focused and retrieve focus to editor
+         * Return focus to editor
          *
          * @method removeFocus
          * @protected
@@ -270,15 +276,23 @@ YUI.add('toolbar-base', function(Y) {
             }
         },
 
-        _onKeyDown: function(evt) {
+        /**
+         * Performs the action associated with keys:
+         * - TAB: focus next visible toolbar
+         * - ESC: return focus to editor
+         *
+         * @param event: key event
+         * @protected
+         */
+        _onKeyDown: function(event) {
             var instance = this;
 
-            if (evt.keyCode === KEY_TAB) {
-                evt.preventDefault();
+            if (event.keyCode === KEY_TAB) {
+                event.preventDefault();
 
                 instance.focusNextToolbar();
 
-            } else if (evt.keyCode === KEY_ESC) {
+            } else if (event.keyCode === KEY_ESC) {
                 instance.removeFocus();
             }
         },
