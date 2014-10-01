@@ -31,7 +31,7 @@ CKEDITOR.disableAutoInline = true;
 
             for (key in this._config) {
                 if (Object.prototype.hasOwnProperty.call(this._config, key)) {
-                    editor.config.key = this._config[key];
+                    editor.config[key] = this._config[key];
                 }
             }
 
