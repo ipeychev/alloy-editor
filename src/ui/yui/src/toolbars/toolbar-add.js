@@ -78,17 +78,6 @@ YUI.add('toolbar-add', function(Y) {
                 this._renderTrigger();
             },
 
-            /**
-             * Return the focus to editor and show again the _triggerButton
-             *
-             * @method removeFocus
-             * @protected
-             */
-            removeFocus: function() {
-                this.get('editor').focus();
-
-                this._showTriggerAtPoint(this._triggerButtonPosition.left, this._triggerButtonPosition.top);
-            },
 
             /**
              * Calculates and sets the position of the toolbar.
@@ -127,6 +116,26 @@ YUI.add('toolbar-add', function(Y) {
                 this._moveToPoint(this.getConstrainedXY(xy), direction, {
                     visible: visible
                 });
+            },
+
+            /**
+             * If toolbar is visible, puts focus on it with FocusManager. 
+             * If not, trigger button is focused
+             *
+             * @method _focus
+             * @protected
+             * @return {Boolean} if toolbar has been focused
+             */
+            _focus: function() {
+                var buttonsContainer = this.get('buttonsContainer');
+
+                if (this.get('visible')) {
+                    buttonsContainer.focusManager.focus(0);
+                } else {
+                    this._triggerButton.focus();
+                }
+
+                return true;
             },
 
             /**
@@ -179,7 +188,7 @@ YUI.add('toolbar-add', function(Y) {
                     this._triggerButtonPosition = {
                         left: this._editorNode.getX(),
                         top: selectionData.region.top + startRect.height / 2
-                    }
+                    };
 
                     this._showTriggerAtPoint(this._triggerButtonPosition.left, this._triggerButtonPosition.top);
                 }
@@ -228,6 +237,18 @@ YUI.add('toolbar-add', function(Y) {
              */
             ownsNode: function(node) {
                 return this.get('boundingBox').contains(node) || this._trigger.get('boundingBox').contains(node);
+            },
+
+            /**
+             * Returns the focus to the editor and shows again the _triggerButton
+             *
+             * @method _removeFocus
+             * @protected
+             */
+            _removeFocus: function() {
+                this.get('editor').focus();
+
+                this._showTriggerAtPoint(this._triggerButtonPosition.left, this._triggerButtonPosition.top);
             },
 
             /**
@@ -299,7 +320,7 @@ YUI.add('toolbar-add', function(Y) {
 
                 this._editorNode.focus();
 
-                this.focus();
+                this._focus();
             },
 
             /**
@@ -377,10 +398,6 @@ YUI.add('toolbar-add', function(Y) {
                  */
                 constrain: {
                     validator: Lang.isBoolean,
-                    value: true
-                },
-
-                defaultToolbar: {
                     value: true
                 },
 

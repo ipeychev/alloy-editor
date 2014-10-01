@@ -6,10 +6,6 @@ YUI.add('toolbar-base', function(Y) {
 
         EMPTY_LINE_REGEX = /\r?\n/;
 
-    var KEY_ESC = 27;
-
-    var KEY_TAB = 9;
-
     function ToolbarBase() {}
 
     /**
@@ -54,82 +50,30 @@ YUI.add('toolbar-base', function(Y) {
                 }
             );
 
+            instance.after('render', instance._afterRender, instance);
+
             editor.on('editorInteraction', instance._onEditorInteraction, instance);
         },
 
         /**
-         * Initializes the focusManager and listen to keyboard events
+         * When toolbar has been rendered, initialize the focus manager and attach
+         * listener for keyboard events
          *
-         * @method syncUI
+         * @method _afterRender
          * @protected
          */
-        syncUI: function() {
+        _afterRender: function() {
             var buttonsContainer = this.get('buttonsContainer');
 
             buttonsContainer.plug(Y.Plugin.NodeFocusManager, {
                 activeDescendant: 0,
-                circular   : true,
+                circular: true,
                 descendants: 'button',
-                focusClass : 'focus',
-                keys       : {next: 'down:39', previous: 'down:37'}
+                focusClass: 'focus',
+                keys: {next: 'down:39', previous: 'down:37'}
             });
 
             Y.one(buttonsContainer.getDOMNode()).on('keydown', this._onKeyDown, this);
-        },
-
-        /**
-         * Check if toolbar is currently focused. If not, put focus on it. If yes,
-         * retrieves focus to editor (works like 'ESC' button)
-         *
-         * @method focus
-         * @protected
-         */
-        focus: function() {
-            var buttonsContainer = this.get('buttonsContainer');
-
-            if (!buttonsContainer.focusManager.get('focused')) {
-                buttonsContainer.focusManager.focus(0);
-            }
-        },
-
-        /**
-         * Search between the editor's toolbars the next one to be focused.
-         * If noone else is visible, the default button ('add') will be shown
-         *
-         * @method focusNextToolbar
-         * @protected
-         */
-        focusNextToolbar: function() {
-           var defaultToolbar,
-               found = false,
-               i,
-               toolbars = this.get('editor').config.toolbars;
-
-            for (i in toolbars) {
-                if (toolbars[i].get('defaultToolbar')) {
-                    defaultToolbar = toolbars[i];
-                }
-
-                //skip current toolbar
-                if ((toolbars[i].get('buttonsContainer') != this.get('buttonsContainer')) && toolbars[i].get('visible')) {
-                    toolbars[i].focus();
-                    found = true;
-                }
-            }
-
-            if (!found && defaultToolbar) {
-                defaultToolbar._triggerButton ? defaultToolbar._triggerButton.focus() : defaultToolbar.focus();
-            }
-        },
-
-        /**
-         * Return focus to editor
-         *
-         * @method removeFocus
-         * @protected
-         */
-        removeFocus: function() {
-            this.get('editor').focus();
         },
 
         /**
@@ -207,11 +151,30 @@ YUI.add('toolbar-base', function(Y) {
         },
 
         /**
+         * If toolbar is visible, puts focus on it with FocusManager
+         *
+         * @method focus
+         * @protected
+         * @return {Boolean} if toolbar has been focused or not
+         */
+        _focus: function() {
+            var buttonsContainer;
+
+            buttonsContainer = this.get('buttonsContainer');
+
+            if (this.get('visible')) {
+                buttonsContainer.focusManager.focus(0);
+            }
+
+            return this.get('visible');
+        },
+
+        /**
          * Returns the container in which all buttons are being rendered.
          *
          * @method _getButtonsContainer
          * @protected
-         * @return {Node} The container of all buttons attached to the current isntance of Toolbar.
+         * @return {Node} The container of all buttons attached to the current instance of Toolbar.
          */
         _getButtonsContainer: function() {
             return this._buttonsContainer;
@@ -277,24 +240,24 @@ YUI.add('toolbar-base', function(Y) {
         },
 
         /**
-         * Performs the action associated with keys:
-         * - TAB: focus next visible toolbar
-         * - ESC: return focus to editor
+         * Fires <code>toolbarKeyDown</code> event. Editor should listen this event
+         * and perform the associated action
          *
-         * @param event: key event
+         * @param {Event} event key event
          * @protected
          */
         _onKeyDown: function(event) {
-            var instance = this;
+            this.get('editor').fire('toolbarKeyDown', event);
+        },
 
-            if (event.keyCode === KEY_TAB) {
-                event.preventDefault();
-
-                instance.focusNextToolbar();
-
-            } else if (event.keyCode === KEY_ESC) {
-                instance.removeFocus();
-            }
+        /**
+         * Return focus to editor
+         *
+         * @method removeFocus
+         * @protected
+         */
+        _removeFocus: function() {
+            this.get('editor').focus();
         },
 
         /**
@@ -320,13 +283,6 @@ YUI.add('toolbar-base', function(Y) {
         buttonsContainer: {
             getter: '_getButtonsContainer',
             readOnly: true
-        },
-
-        /**
-         * There should be only one default toolbar.
-         */
-        defaultToolbar: {
-            validator: Lang.isBoolean
         },
 
         /**
