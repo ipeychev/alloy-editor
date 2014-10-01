@@ -180,7 +180,28 @@
         },
 
         _onToolbarClick: function(event) {
+            var target = new CKEDITOR.dom.element(event.data.$.target);
 
+            var button = target.getAscendant('button', true);
+
+            var type = button.getAttribute('data-type');
+
+            var style = this._styles[type];
+
+            if (style) {
+                if (button.hasClass('alloy-editor-button-checked')) {
+                    this._editor.removeStyle(style);
+
+                    button.removeClass('alloy-editor-button-checked');
+                }
+                else {
+                    this._editor.applyStyle(style);
+
+                    button.addClass('alloy-editor-button-checked');
+                }
+
+                this._updateButtonsUI();
+            }
         },
 
         _updateButtonsUI: function() {
@@ -188,7 +209,22 @@
 
             for (key in this._styles) {
                 if (Object.prototype.hasOwnProperty.call(this._styles, key)) {
+                    var button = this._toolbarEl.findOne('[data-type=' + key + ']');
 
+                    if (button) {
+                        var style = this._styles[key];
+
+                        var elementPath = this._editor.elementPath();
+
+                        var result = style.checkActive(elementPath, editor);
+
+                        if (result) {
+                            button.addClass('alloy-editor-button-checked');
+                        }
+                        else {
+                            button.removeClass('alloy-editor-button-checked');
+                        }
+                    }
                 }
             }
         },
@@ -200,26 +236,26 @@
 
         TPL_CONTENT:
             '<div class="alloy-editor-buttons-container">' +
-                '<button data-type="bold" class="alloy-editor-button alloy-editor-button-bold">' +
-                    '<i class="alloy-editor-icon"></i>' +
+                '<button data-type="strong" class="alloy-editor-button alloy-editor-button-bold">' +
+                    '<i class="alloy-editor-icon-bold"></i>' +
                 '</button>' +
-                '<button data-type="italic" class="alloy-editor-button alloy-editor-button-italic">' +
-                    '<i class="alloy-editor-icon"></i>' +
+                '<button data-type="em" class="alloy-editor-button alloy-editor-button-italic">' +
+                    '<i class="alloy-editor-icon-italic"></i>' +
                 '</button>' +
-                '<button data-type="underline" class="alloy-editor-button alloy-editor-button-underline">' +
-                    '<i class="alloy-editor-icon"></i>' +
+                '<button data-type="u" class="alloy-editor-button alloy-editor-button-underline">' +
+                    '<i class="alloy-editor-icon-underline"></i>' +
                 '</button>' +
                 '<button data-type="h1" class="alloy-editor-button alloy-editor-button-h1">' +
-                    '<i class="alloy-editor-icon"></i>' +
+                    '<i class="alloy-editor-icon-h1"></i>' +
                 '</button>' +
                 '<button data-type="h2" class="alloy-editor-button alloy-editor-button-h2">' +
-                    '<i class="alloy-editor-icon"></i>' +
+                    '<i class="alloy-editor-icon-h2"></i>' +
                 '</button>' +
                 '<button data-type="h3" class="alloy-editor-button alloy-editor-button-h3">' +
-                    '<i class="alloy-editor-icon"></i>' +
+                    '<i class="alloy-editor-icon-h3"></i>' +
                 '</button>' +
                 '<button data-type="h4" class="alloy-editor-button alloy-editor-button-h4">' +
-                    '<i class="alloy-editor-icon"></i>' +
+                    '<i class="alloy-editor-icon-h4"></i>' +
                 '</button>' +
             '</div>'
     };
