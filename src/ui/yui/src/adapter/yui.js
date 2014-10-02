@@ -79,26 +79,68 @@ YUI.add('alloy-editor', function(Y) {
         },
 
         /**
-         * Focus the visible toolbar. If there is more than one visible toolbars, first is selected
+         * It makes a circular search between toolbars to find the next toolbar
+         * that has to be focused.
          *
-         * If there are not visible toolbars,
-         * it searches for toolbars that has trigger
-         *
-         * @method _focusToolbar
+         * @method _focusNextToolbar
          * @protected
          */
-        _focusToolbar: function() {
+        _focusNextToolbar: function() {
             var currentFocusedToolbar,
+                found,
+                i,
+                indexOfCurrentToolbar,
+                splice,
+                toolbar,
+                toolbars;
+
+            currentFocusedToolbar = this._focusedToolbar;
+
+            toolbars = this._editor.config.toolbars;
+
+            //We need to convert toolbars to an array so we can reorder it
+            toolbars = Object.keys(toolbars).map(function(item) { return toolbars[item] });
+
+            indexOfCurrentToolbar = toolbars.indexOf(currentFocusedToolbar);
+
+            splice = toolbars.splice(indexOfCurrentToolbar, toolbars.length - indexOfCurrentToolbar);
+
+            toolbars = splice.concat(toolbars);
+
+            for (i = 0; i < toolbars.length; i++) {
+                toolbar = toolbars[i];
+
+                if (!found && (toolbar != currentFocusedToolbar) && toolbar._focus()) {
+                    this._focusedToolbar = toolbar;
+
+                    found = true;
+                }
+            }
+        },
+
+        /**
+         * Searches for the first visible toolbar in editor. If there is none, but
+         * there is a toolbar with a trigger button, this one will be selected.
+         *
+         * @method _focusVisibleToolbar
+         * @protected
+         */
+        _focusVisibleToolbar: function() {
+            var currentFocusedToolbar,
+                found,
                 i,
                 toolbars;
 
             currentFocusedToolbar = this._focusedToolbar;
+
             toolbars = this._editor.config.toolbars;
 
             for (i in toolbars) {
                 if (hasOwnProperty.call(toolbars, i)) {
-                    if ((toolbars[i] != currentFocusedToolbar) && toolbars[i]._focus()) {
+                    if (!found && (toolbars[i] != currentFocusedToolbar) && toolbars[i]._focus()) {
                         this._focusedToolbar = toolbars[i];
+
+                        found = toolbars[i].get('visible');
                     }
                 }
             }
@@ -171,7 +213,7 @@ YUI.add('alloy-editor', function(Y) {
          */
         _onEditorKeyDown: function(event) {
             if (event.altKey && event.keyCode === KEY_F10) {
-                this._focusToolbar();
+                this._focusVisibleToolbar();
 
             } else if (event.keyCode === KEY_ESC) {
                 this._hideToolbars();
@@ -190,7 +232,7 @@ YUI.add('alloy-editor', function(Y) {
         _onToolbarKeyDown: function(event) {
             if (event.data.keyCode === KEY_TAB) {
                 event.data.preventDefault();
-                this._focusToolbar();
+                this._focusNextToolbar();
 
             } else if (event.data.keyCode === KEY_ESC) {
                 this._focusedToolbar._removeFocus();
