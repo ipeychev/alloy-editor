@@ -107,9 +107,9 @@ YUI.add('toolbar-base', function(Y) {
          * @protected
          */
         _afterRender: function() {
-            var buttonsContainer = this.get('buttonsContainer');
+            var boundingBox = this.get('boundingBox');
 
-            buttonsContainer.plug(Y.Plugin.NodeFocusManager, {
+            boundingBox.plug(Y.Plugin.NodeFocusManager, {
                 activeDescendant: 0,
                 circular: true,
                 descendants: 'button',
@@ -120,7 +120,7 @@ YUI.add('toolbar-base', function(Y) {
                 }
             });
 
-            buttonsContainer.on('keydown', this._onKeyDown, this);
+            boundingBox.on('keydown', this._onKeyDown, this);
         },
 
         /**

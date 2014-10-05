@@ -253,6 +253,8 @@ YUI.add('button-a', function(Y) {
             _onKeyPress: function(event) {
                 if (event.charCode === 13) {
                     this.get('host').hide();
+
+                    event.stopPropagation();
                 }
             },
 

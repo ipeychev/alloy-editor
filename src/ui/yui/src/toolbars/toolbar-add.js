@@ -429,9 +429,16 @@ YUI.add('toolbar-add', function(Y) {
     ToolbarAddTrigger = Y.Base.create('toolbaraddtrigger', Y.Widget, [Y.WidgetPosition, Y.WidgetPositionAlign], {
         BOUNDING_TEMPLATE: '<div class="alloy-editor-toolbar alloy-editor-toolbar-add-trigger"></div>',
 
-        CONTENT_TEMPLATE: '<div class="alloy-editor-toolbar-content btn-toolbar"></div>'
-    }, {
+        CONTENT_TEMPLATE: '<div class="alloy-editor-toolbar-content btn-toolbar"></div>',
 
+        bindUI: function(event) {
+            this.on('visibleChange', function(event) {
+                if (!event.newVal) {
+                    // debugger;
+                }
+            });
+        }
+    }, {
     });
 }, '0.1', {
     requires: ['widget-base', 'widget-position', 'widget-position-constrain', 'widget-position-align', 'toolbar-base', 'toolbar-position']

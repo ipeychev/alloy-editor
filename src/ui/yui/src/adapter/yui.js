@@ -204,6 +204,7 @@ YUI.add('alloy-editor', function(Y) {
                 this._focusVisibleToolbar();
 
             } else if (event.keyCode === KEY_ESC) {
+                console.log('_onEditorKey', 'hide toolbars')
                 this._hideToolbars();
             }
         },
@@ -225,6 +226,8 @@ YUI.add('alloy-editor', function(Y) {
             } else if (event.data.keyCode === KEY_ESC) {
                 this._focusedToolbar.blur();
                 this._focusedToolbar = null;
+
+                console.log('_onToolbarKey', 'hide toolbars')
 
                 this._hideToolbars();
             }
