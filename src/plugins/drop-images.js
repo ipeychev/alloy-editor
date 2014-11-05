@@ -141,13 +141,15 @@
             _processFile: function(file, editor) {
                 var reader = new FileReader();
 
+                var fileName = file.name;
+
                 reader.addEventListener('loadend', function() {
                     var bin,
                         el;
 
                     bin = reader.result;
 
-                    el = CKEDITOR.dom.element.createFromHtml('<img src="' + bin + '">');
+                    el = CKEDITOR.dom.element.createFromHtml('<img src="' + bin + '" data-filename="' + fileName + '">');
 
                     editor.insertElement(el);
 
