@@ -4,7 +4,7 @@ YUI.add('button-quote', function(Y) {
     var Lang = Y.Lang;
 
     var BtnQuote = Y.Base.create('quote', Y.Plugin.Base, [Y.ButtonBase], {
-        TPL_CONTENT: '<i class="alloy-editor-icon-quote-sign"></i>',
+        TPL_CONTENT: '<i class="alloy-editor-icon-quote"></i>',
 
         /**
          * Applies the style of this button if its current status is pressed
