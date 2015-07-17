@@ -16,7 +16,7 @@
      * Specifies the placeholder class which have to be aded to editor when editor is not focuced.
      *
      * @attribute placeholderClass
-     * @default alloy-editor-placeholder
+     * @default ae-placeholder
      * @type String
      */
 
@@ -25,37 +25,34 @@
 
             /**
              * Initialization of the plugin, part of CKEditor plugin lifecycle.
-             * The function registers a 'blur' listener to CKEditor's blur event.
+             * The function registers a 'blur' and 'contentDom' event listeners.
              *
              * @method init
              * @param {Object} editor The current editor instance
              */
             init: function(editor) {
-                editor.on('blur', this._onBlur, this);
+                editor.on('blur', this._checkEmptyData, this);
+                editor.once('contentDom', this._checkEmptyData, this);
             },
 
             /**
-             * Handles the fired blur event. The function removes any data from CKEditor, because an
-             * empty paragraph may still exist despite for the user the editor looks empty and
-             * adds a class, specified via "placeholderClass" config attribute.
+             * Removes any data from the content and adds a class,
+             * specified by the "placeholderClass" config attribute.
              *
-             * @method init
              * @protected
-             * @param {CKEDITOR.dom.event} editor Blur event, fired from CKEditor
+             * @method _checkEmptyData
+             * @param {CKEDITOR.dom.event} editor event, fired from CKEditor
              */
-            _onBlur: function(event) {
-                var editor,
-                    editorNode;
-
-                editor = event.editor;
+            _checkEmptyData: function(event) {
+                var editor = event.editor;
 
                 if (editor.getData() === '') {
-                    editorNode = new CKEDITOR.dom.element(editor.element.$);
+                    var editorNode = new CKEDITOR.dom.element(editor.element.$);
 
                     // Despite getData() returns empty string, the content still may have
-                    // content - an empty paragrapgh. This prevents :empty selector in
+                    // data - an empty paragraph. This breaks the :empty selector in
                     // placeholder's CSS and placeholder does not appear.
-                    // For that reason we will intentionally remove any content from editorNode.
+                    // For that reason, we will intentionally remove any content from editorNode.
                     editorNode.setHtml('');
 
                     editorNode.addClass(editor.config.placeholderClass);

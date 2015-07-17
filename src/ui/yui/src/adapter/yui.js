@@ -339,13 +339,13 @@ YUI.add('alloy-editor', function(Y) {
              * make AlloyEditor to work properly.
              *
              * @attribute extraPlugins
-             * @default 'uicore,selectionregion,dropimages,placeholder,linktooltip,uiloader'
+             * @default 'uicore,selectionregion,addimages,placeholder,linktooltip,uiloader'
              * @writeOnce
              * @type {String}
              */
             extraPlugins: {
                 validator: Lang.isString,
-                value: 'uicore,selectionregion,dropimages,placeholder,linktooltip,uiloader',
+                value: 'uicore,selectionregion,addimages,placeholder,linktooltip,uiloader',
                 writeOnce: true
             },
 
@@ -445,6 +445,17 @@ YUI.add('alloy-editor', function(Y) {
                     image: ['left', 'right'],
                     styles: ['strong', 'em', 'u', 'h1', 'h2', 'a', 'twitter']
                 }
+            },
+
+            /**
+             * The Node ID or HTMl node, where AlloyEditor's UI should be rendered.
+             *
+             * @attribute uiNode
+             * @type String | Node
+             * @writeOnce
+             */
+            uiNode: {
+                setter: Y.one
             }
         }
     });

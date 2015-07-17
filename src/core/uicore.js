@@ -29,13 +29,13 @@
      * - selectionData - The data, returned from {{#crossLink "CKEDITOR.plugins.selectionregion/getSelectionData:method"}}{{/crossLink}}
      */
 
-     /**
-      * Fired by UI elements like Toolbars or Buttons when their state changes. The listener updates the live region with the provided data.
-      *
-      * @event ariaUpdate
-      * @param {Object} data An object which contains the following properties:
-      * - message - The provided message from the UI element.
-      */
+    /**
+     * Fired by UI elements like Toolbars or Buttons when their state changes. The listener updates the live region with the provided data.
+     *
+     * @event ariaUpdate
+     * @param {Object} data An object which contains the following properties:
+     * - message - The provided message from the UI element.
+     */
 
     /**
      * If set to true, the editor will still fire {{#crossLink "CKEDITOR.plugins.uicore/editorInteraction:event"}}{{/crossLink}} event,
@@ -60,29 +60,25 @@
             /**
              * Initializer lifecycle implementation for the UICore plugin.
              *
-             * @method init
              * @protected
+             * @method init
              * @param {Object} editor The current CKEditor instance.
              */
             init: function(editor) {
-                var ariaElement,
-                    ariaState = [],
-                    handleAria,
-                    handleUI,
-                    uiTasksTimeout;
+                var ariaState = [];
 
-                ariaElement = this._createAriaElement(editor.id);
+                var ariaElement = this._createAriaElement(editor.id);
 
-                uiTasksTimeout = editor.config.uicore ? editor.config.uicore.timeout : 50;
+                var uiTasksTimeout = editor.config.uicore ? editor.config.uicore.timeout : 50;
 
-                handleAria = CKEDITOR.tools.debounce(
+                var handleAria = CKEDITOR.tools.debounce(
                     function(event) {
                         ariaElement.innerHTML = ariaState.join('. ');
                     },
                     uiTasksTimeout
                 );
 
-                handleUI = CKEDITOR.tools.debounce(
+                var handleUI = CKEDITOR.tools.debounce(
                     function(event) {
                         ariaState = [];
 
@@ -108,28 +104,32 @@
                     handleAria();
                 });
 
-                editor.on('contentDom', function() {
+                editor.once('contentDom', function() {
                     var editable = editor.editable();
 
                     editable.attachListener(editable, 'mouseup', handleUI);
                     editable.attachListener(editable, 'keyup', handleUI);
+                });
+
+                editor.on('destroy', function(event) {
+                    ariaElement.parentNode.removeChild(ariaElement);
+
+                    handleUI.detach();
                 });
             },
 
             /**
              * Creates and applies an HTML element to the body of the document which will contain ARIA messages.
              *
-             * @method _createAriaElement
              * @protected
+             * @method _createAriaElement
              * @param {String} id The provided id of the element. It will be used as prefix for the final element Id.
              * @return {HTMLElement} The created and applied to DOM element.
              */
             _createAriaElement: function(id) {
-                var statusElement;
+                var statusElement = document.createElement('div');
 
-                statusElement = document.createElement('div');
-
-                statusElement.className = 'sr-only';
+                statusElement.className = 'ae-sr-only';
 
                 statusElement.setAttribute('aria-live', 'polite');
                 statusElement.setAttribute('role', 'status');

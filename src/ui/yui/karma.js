@@ -92,7 +92,7 @@ var defaultConfig = {
         'dist/alloy-editor-*/alloy-editor/yui-config.js': ['coverage'],
         'dist/alloy-editor-*/alloy-editor/plugins/*.js': ['coverage'],
         'dist/alloy-editor-*/alloy-editor/toolbars/*.js': ['coverage'],
-        'dist/alloy-editor-*/alloy-editor/buttons/*.js': ['coverage'],
+        'dist/alloy-editor-*/alloy-editor/buttons/*.js': ['coverage']
     },
 
     // test results reporter to use

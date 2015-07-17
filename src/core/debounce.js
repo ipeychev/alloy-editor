@@ -14,6 +14,7 @@
      * debounced with, let's say 100ms. The real execution of this function will happen 100ms after last
      * scroll event.
      *
+     * @static
      * @method debounce
      * @param {Function} callback The callback which has to be called after given timeout.
      * @param {Number} timeout Timeout in milliseconds after which the callback will be called.
@@ -21,25 +22,20 @@
      * @param {Array} args An array of arguments which the callback will receive.
      */
     CKEDITOR.tools.debounce = CKEDITOR.tools.debounce || function(callback, timeout, context, args) {
-        var callFn,
-            debounceHandle;
+        var debounceHandle;
 
-        callFn = function() {
-            var callArgs,
-                callContext,
-                len,
-                result = [],
-                startIndex = 0;
+        var callFn = function() {
+            var callContext = context || this;
 
-            callContext = context || this;
+            clearTimeout(debounceHandle);
 
-            for (len = arguments.length; startIndex < len; ++startIndex) {
+            var result = [];
+
+            for (var len = arguments.length, startIndex = 0; startIndex < len; ++startIndex) {
                 result.push(arguments[startIndex]);
             }
 
-            callArgs = result.concat(args || []);
-
-            clearTimeout(debounceHandle);
+            var callArgs = result.concat(args || []);
 
             debounceHandle = setTimeout(function() {
                 callback.apply(callContext, callArgs);

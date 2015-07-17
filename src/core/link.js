@@ -1,12 +1,14 @@
 (function() {
     'use strict';
 
+    var REGEX_URI_SCHEME = /^(?:[a-z][a-z0-9+\-.]*)\:|^\//i;
+
     /**
      * Link class utility. Provides methods for create, delete and update links.
      *
      * @class CKEDITOR.Link
      * @constructor
-     * @param {Object} The CKEditor instance.
+     * @param {Object} editor The CKEditor instance.
      */
 
     function Link(editor) {
@@ -24,28 +26,24 @@
          * @param {Object} attrs A config object with link attributes. These might be arbitrary DOM attributes.
          */
         create: function(URI, attrs) {
-            var linkAttrs,
-                range,
-                selection,
-                style,
-                text;
+            var selection = this._editor.getSelection();
 
-            selection = this._editor.getSelection();
-
-            range = selection.getRanges()[0];
+            var range = selection.getRanges()[0];
 
             if (range.collapsed) {
-                text = new CKEDITOR.dom.text(URI, this._editor.document);
+                var text = new CKEDITOR.dom.text(URI, this._editor.document);
                 range.insertNode(text);
                 range.selectNodeContents(text);
             }
 
-            linkAttrs = CKEDITOR.tools.merge({
+            URI = this._getCompleteURI(URI);
+
+            var linkAttrs = CKEDITOR.tools.merge({
                 'data-cke-saved-href': URI,
                 href: URI
             }, attrs);
 
-            style = new CKEDITOR.style({
+            var style = new CKEDITOR.style({
                 attributes: linkAttrs,
                 element: 'a'
             });
@@ -62,19 +60,15 @@
          * @return {CKEDITOR.dom.element} The retrieved link or null if not found.
          */
         getFromSelection: function() {
-            var range,
-                selection,
-                selectedElement;
+            var selection = this._editor.getSelection();
 
-            selection = this._editor.getSelection();
-
-            selectedElement = selection.getSelectedElement();
+            var selectedElement = selection.getSelectedElement();
 
             if (selectedElement && selectedElement.is('a')) {
                 return selectedElement;
             }
 
-            range = selection.getRanges()[0];
+            var range = selection.getRanges()[0];
 
             if (range) {
                 range.shrink(CKEDITOR.SHRINK_TEXT);
@@ -92,16 +86,12 @@
          * @method remove
          */
         remove: function(link) {
-            var editor,
-                selection,
-                style;
-
-            editor = this._editor;
+            var editor = this._editor;
 
             if (link) {
                 link.remove(editor);
             } else {
-                style = link || new CKEDITOR.style({
+                var style = link || new CKEDITOR.style({
                     alwaysRemoveElement: 1,
                     element: 'a',
                     type: CKEDITOR.STYLE_INLINE
@@ -111,7 +101,7 @@
                 //  We need to force the selection to be the whole link element
                 //  to remove it properly.
 
-                selection = editor.getSelection();
+                var selection = editor.getSelection();
                 selection.selectElement(selection.getStartElement());
 
                 editor.removeStyle(style);
@@ -121,19 +111,34 @@
         /**
          * Updates the href of an already existing link.
          *
+         * @method update
          * @param {String} URI The new URI of the link.
          * @param {CKEDITOR.dom.element} link The link element which href should be removed.
-         * @method update
          */
         update: function(URI, link) {
-            var style;
-
-            style = link || this.getFromSelection();
+            var style = link || this.getFromSelection();
 
             style.setAttributes({
                 'data-cke-saved-href': URI,
                 href: URI
             });
+        },
+
+        /**
+         * Checks if the URI has a scheme. If not, the default 'http' scheme with
+         * hierarchical path '//' is added to it.
+         *
+         * @protected
+         * @method _getCompleteURI
+         * @param {String} URI The URI of the link.
+         * @return {String} The URI updated with the protocol.
+         */
+        _getCompleteURI: function(URI) {
+            if (!REGEX_URI_SCHEME.test(URI)) {
+                URI = 'http://' + URI;
+            }
+
+            return URI;
         }
     };
 

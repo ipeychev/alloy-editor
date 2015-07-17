@@ -89,17 +89,11 @@ YUI.add('button-a', function(Y) {
                 this._button.set('pressed', !!result && !dataType);
 
                 iconLinkNode = this._button.get('boundingBox').one('i');
-
-                if (this._button.get('pressed')) {
-                    iconLinkNode.replaceClass('alloy-editor-icon-link', 'alloy-editor-icon-unlink');
-                } else {
-                    iconLinkNode.replaceClass('alloy-editor-icon-unlink', 'alloy-editor-icon-link');
-                }
             },
 
             /**
              * Changes position of the Toolbar, and adjusts it according to the selection,
-             * since the width of the UI for adding/edtiting of link href  might be shorter
+             * since the width of the UI for adding/editing of link href might be shorter
              * or larger than the default Toolbar UI.
              *
              * @method _adjustHostPosition
@@ -591,11 +585,10 @@ YUI.add('button-a', function(Y) {
                     this.fire('actionPerformed');
                 }
 
-                oldHostWidth = this.get('host').get('boundingBox').get('offsetWidth');
-
                 this._linkContainer.addClass('hide');
                 this._buttonsContainer.removeClass('hide');
 
+                oldHostWidth = this.get('host').get('boundingBox').get('offsetWidth');
                 this._adjustHostPosition(oldHostWidth);
             },
 
@@ -609,7 +602,8 @@ YUI.add('button-a', function(Y) {
              */
             _switchToLinkView: function(link) {
                 var editor,
-                    linkInput;
+                    linkInput,
+                    oldHostWidth;
 
                 editor = this.get('host').get('editor');
 
@@ -629,6 +623,9 @@ YUI.add('button-a', function(Y) {
 
                 this._attachToolbarActiveHook();
                 this._attachHideHandler();
+
+                oldHostWidth = this.get('host').get('boundingBox').get('offsetWidth');
+                this._adjustHostPosition(oldHostWidth);
             },
 
             /**
@@ -700,7 +697,7 @@ YUI.add('button-a', function(Y) {
                 '</div>' +
                 '<div class="pull-right btn-group show-buttons-container">' +
                 '<button aria-label="{back}" class="alloy-editor-button btn btn-default switch-to-edit">' +
-                '<i class="alloy-editor-icon-remove"></i></button>' +
+                '<i class="alloy-editor-icon-close"></i></button>' +
                 '</div>' +
                 '</div>'
         }, {
