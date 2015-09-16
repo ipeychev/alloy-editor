@@ -20,7 +20,7 @@ var languageFiles = require('../_languages.js');
 gulp.task('prepare-files', function(done) {
     runSequence(
         'clean-dist', 'create-output-dir', [
-            'build-css', 'copy-ckeditor', 'copy-core-files', 'copy-language-files', 'copy-react'
+            'build-css', 'copy-ckeditor', 'copy-core-files', 'copy-language-files', 'copy-react', 'copy-test-plugins'
         ], done);
 });
 
@@ -29,7 +29,7 @@ gulp.task('create-output-dir', function(callback) {
 });
 
 gulp.task('copy-core-files', function() {
-    return gulp.src(srcFiles, {cwd: 'src', base: 'src'})
+    return gulp.src(srcFiles.main.concat(srcFiles.ui), {cwd: 'src', base: 'src'})
         .pipe(babel())
         .pipe(gulp.dest(path.join(editorDistFolder, 'test')));
 });
@@ -42,6 +42,11 @@ gulp.task('copy-language-files', function() {
 gulp.task('copy-react', function() {
     return gulp.src(path.join(reactDir, 'vendor', 'react-with-addons.js'))
         .pipe(gulp.dest(editorDistFolder));
+});
+
+gulp.task('copy-test-plugins', function() {
+    return gulp.src(path.join(reactDir, 'test', 'plugins', '/**'))
+        .pipe(gulp.dest(path.join(editorDistFolder, 'plugins')));
 });
 
 gulp.task('test', ['prepare-files'], function (done) {

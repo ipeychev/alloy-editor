@@ -1,7 +1,7 @@
 (function() {
     'use strict';
 
-    if (CKEDITOR.plugins.get('selectionregion')) {
+    if (CKEDITOR.plugins.get('ae_selectionregion')) {
         return;
     }
 
@@ -16,7 +16,7 @@
      * be merged into each editor instance, so the developer may use them directly via the editor, without making
      * an instance of this class**.
      *
-     * @class CKEDITOR.plugins.selectionregion
+     * @class CKEDITOR.plugins.ae_selectionregion
      * @constructor
      */
     function SelectionRegion() {}
@@ -113,7 +113,19 @@
         getCaretRegion: function() {
             var selection = this.getSelection();
 
+            var region = {
+                bottom: 0,
+                left: 0,
+                right: 0,
+                top: 0
+            };
+
             var bookmarks = selection.createBookmarks();
+
+            if (!bookmarks.length) {
+                return region;
+            }
+
             var bookmarkNodeEl = bookmarks[0].startNode.$;
 
             bookmarkNodeEl.style.display = 'inline-block';
@@ -124,12 +136,12 @@
 
             var scrollPos = new CKEDITOR.dom.window(window).getScrollPosition();
 
-            return {
-                bottom: scrollPos.y + region.bottom,
-                left: scrollPos.x + region.left,
-                right: scrollPos.x + region.right,
-                top: scrollPos.y + region.top
-            };
+            region.bottom = scrollPos.y + region.bottom,
+            region.left = scrollPos.x + region.left,
+            region.right = scrollPos.x + region.right,
+            region.top = scrollPos.y + region.top
+
+            return region;
         },
 
         /**
@@ -139,7 +151,7 @@
          * @return {Object|null} Returns an object with the following data:
          * - element - The currently selected element, if any
          * - text - The selected text
-         * - region - The data, returned from {{#crossLink "CKEDITOR.plugins.selectionregion/getSelectionRegion:method"}}{{/crossLink}}
+         * - region - The data, returned from {{#crossLink "CKEDITOR.plugins.ae_selectionregion/getSelectionRegion:method"}}{{/crossLink}}
          */
         getSelectionData: function() {
             var selection = this.getSelection();
@@ -163,7 +175,7 @@
          *
          * @method getSelectionRegion
          * @return {Object} Returns object which is being returned from
-         * {{#crossLink "CKEDITOR.plugins.selectionregion/getClientRectsRegion:method"}}{{/crossLink}} with three more properties:
+         * {{#crossLink "CKEDITOR.plugins.ae_selectionregion/getClientRectsRegion:method"}}{{/crossLink}} with three more properties:
          * - direction - the direction of the selection. Can be one of these:
          *   1. CKEDITOR.SELECTION_TOP_TO_BOTTOM
          *   2. CKEDITOR.SELECTION_BOTTOM_TO_TOP
@@ -353,7 +365,7 @@
     };
 
     CKEDITOR.plugins.add(
-        'selectionregion', {
+        'ae_selectionregion', {
             /**
              * Initializer lifecycle implementation for the SelectionRegion plugin.
              *

@@ -8,6 +8,7 @@ var argv = require('yargs').argv;
 var path = require('path');
 
 var srcFiles = require('./_src.js');
+srcFiles = srcFiles.main.concat(srcFiles.ui);
 
 var preprocessors = {
     '**/*.jsx': ['babel'],
@@ -25,11 +26,11 @@ var filesToLoad = [
         included: true,
         watched: false
     }, {
-        pattern: path.join(alloyEditorDir, 'assets/fonts/alloyeditor.woff'),
+        pattern: path.join(alloyEditorDir, 'assets/fonts/alloyeditor-ocean.woff'),
         included: false,
         watched: false
     }, {
-        pattern: path.join(alloyEditorDir, 'assets/fonts/alloyeditor.ttf'),
+        pattern: path.join(alloyEditorDir, 'assets/fonts/alloyeditor-ocean.ttf'),
         included: false,
         watched: false
     },
@@ -56,6 +57,10 @@ var filesToLoad = [
         watched: false
     }, {
         pattern: path.join(alloyEditorDir, 'lang/*.js'),
+        included: true,
+        watched: false
+    }, {
+        pattern: path.join(alloyEditorDir, 'plugins/test_*/plugin.js'),
         included: true,
         watched: false
     },
