@@ -60,8 +60,10 @@
          * @method destructor
          */
         destructor: function() {
+            this._destroyed = true;
+
             if (this._editorUIElement) {
-                React.unmountComponentAtNode(this._editorUIElement);
+                ReactDOM.unmountComponentAtNode(this._editorUIElement);
                 this._editorUIElement.parentNode.removeChild(this._editorUIElement);
             }
 
@@ -71,6 +73,10 @@
                 var editable = nativeEditor.editable();
                 if (editable) {
                     editable.removeClass('ae-editable');
+
+                    if (this.get('enableContentEditable')) {
+                        this.get('srcNode').setAttribute('contenteditable', 'false');
+                    }
                 }
 
                 nativeEditor.destroy();
@@ -95,26 +101,28 @@
          * @method _renderUI
          */
         _renderUI: function() {
-            var editorUIElement = document.createElement('div');
-            editorUIElement.className = 'ae-ui';
+            if (!this._destroyed) {
+                var editorUIElement = document.createElement('div');
+                editorUIElement.className = 'ae-ui';
 
-            var uiNode = this.get('uiNode') || document.body;
+                var uiNode = this.get('uiNode') || document.body;
 
-            uiNode.appendChild(editorUIElement);
+                uiNode.appendChild(editorUIElement);
 
-            this._mainUI = React.render(React.createElement(AlloyEditor.UI, {
-                editor: this,
-                eventsDelay: this.get('eventsDelay'),
-                toolbars: this.get('toolbars')
-            }), editorUIElement);
+                this._mainUI = ReactDOM.render(React.createElement(AlloyEditor.UI, {
+                    editor: this,
+                    eventsDelay: this.get('eventsDelay'),
+                    toolbars: this.get('toolbars')
+                }), editorUIElement);
 
-            this._editorUIElement = editorUIElement;
+                this._editorUIElement = editorUIElement;
 
-            this.get('nativeEditor').fire('uiReady');
+                this.get('nativeEditor').fire('uiReady');
+            }
         },
 
         /**
-         * The function returns an HTML element from the passed value. If the passed value is a string, it should be 
+         * The function returns an HTML element from the passed value. If the passed value is a string, it should be
          * the Id of the element which have to be retrieved from the DOM.
          * If an HTML Element is passed, the element itself will be returned.
          *
@@ -212,7 +220,7 @@
              */
             extraPlugins: {
                 validator: AlloyEditor.Lang.isString,
-                value: 'uicore,selectionregion,dragresize,addimages,placeholder,tabletools,tableresize,autolink',
+                value: 'ae_uicore,ae_selectionregion,ae_dragresize,ae_addimages,ae_placeholder,ae_tabletools,ae_tableresize,ae_autolink',
                 writeOnce: true
             },
 
@@ -230,7 +238,7 @@
 
             /**
              * Specifies the class, which should be added by Placeholder plugin
-             * {{#crossLink "CKEDITOR.plugins.placeholder}}{{/crossLink}}
+             * {{#crossLink "CKEDITOR.plugins.ae_placeholder}}{{/crossLink}}
              * when editor is not focused.
              *
              * @property placeholderClass

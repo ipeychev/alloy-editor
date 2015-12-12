@@ -1,7 +1,7 @@
 (function() {
     'use strict';
 
-    if (CKEDITOR.plugins.get('autolink')) {
+    if (CKEDITOR.plugins.get('ae_autolink')) {
         return;
     }
 
@@ -30,11 +30,11 @@
     /**
      * CKEditor plugin which automatically generates links when user types text which looks like URL.
      *
-     * @class CKEDITOR.plugins.autolink
+     * @class CKEDITOR.plugins.ae_autolink
      * @constructor
      */
     CKEDITOR.plugins.add(
-        'autolink', {
+        'ae_autolink', {
 
             /**
              * Initialization of the plugin, part of CKEditor plugin lifecycle.
@@ -201,6 +201,9 @@
                 ckLink.create(content);
                 this._ckLink = ckLink;
 
+                var linkNode = this._startContainer.getNext() || this._startContainer;
+                editor.fire('autolinkAdd', linkNode.getParent());
+
                 this._subscribeToKeyEvent(editor);
 
                 // Now range is on the link and it is selected. We have to
@@ -224,6 +227,13 @@
                 range.select();
             },
 
+            /**
+             * Fired when a URL is detected in text and converted to a link.
+             *
+             * @event autolinkAdd
+             * @param {CKEDITOR.dom.element} el Node of the created link.
+             */
+	  
             /**
              * Removes the created link element, and replaces it by its text.
              *

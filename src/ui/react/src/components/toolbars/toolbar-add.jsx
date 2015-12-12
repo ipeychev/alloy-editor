@@ -204,7 +204,7 @@
          */
         _updatePosition: function() {
             // If component is not mounted, there is nothing to do
-            if (!React.findDOMNode(this)) {
+            if (!ReactDOM.findDOMNode(this)) {
                 return;
             }
 
@@ -220,14 +220,14 @@
                 }
 
                 if (region) {
-                    var domNode = React.findDOMNode(this);
+                    var domNode = ReactDOM.findDOMNode(this);
                     var domElement = new CKEDITOR.dom.element(domNode);
 
                     var startRect = region.startRect || region;
                     var left = this.props.editor.get('nativeEditor').editable().getClientRect().left;
 
                     domNode.style.left = left - domNode.offsetWidth - this.props.gutterExclusive.left + 'px';
-                    domNode.style.top = region.top - domNode.offsetHeight/2 + startRect.height/2 + 'px';
+                    domNode.style.top = Math.floor(region.top - domNode.offsetHeight/2 + startRect.height/2) + 'px';
                     domNode.style.opacity = 1;
 
                     domElement.removeClass('ae-arrow-box');

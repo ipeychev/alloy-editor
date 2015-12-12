@@ -8,6 +8,7 @@ var argv = require('yargs').argv;
 var path = require('path');
 
 var srcFiles = require('./_src.js');
+srcFiles = srcFiles.main.concat(srcFiles.ui);
 
 var preprocessors = {
     '**/*.jsx': ['babel'],
@@ -25,11 +26,11 @@ var filesToLoad = [
         included: true,
         watched: false
     }, {
-        pattern: path.join(alloyEditorDir, 'assets/fonts/alloyeditor.woff'),
+        pattern: path.join(alloyEditorDir, 'assets/fonts/alloyeditor-ocean.woff'),
         included: false,
         watched: false
     }, {
-        pattern: path.join(alloyEditorDir, 'assets/fonts/alloyeditor.ttf'),
+        pattern: path.join(alloyEditorDir, 'assets/fonts/alloyeditor-ocean.ttf'),
         included: false,
         watched: false
     },
@@ -58,6 +59,10 @@ var filesToLoad = [
         pattern: path.join(alloyEditorDir, 'lang/*.js'),
         included: true,
         watched: false
+    }, {
+        pattern: path.join(alloyEditorDir, 'plugins/test_*/plugin.js'),
+        included: true,
+        watched: false
     },
 
     /* bender requires CKEDITOR, should be after ckeditor.js */
@@ -68,7 +73,7 @@ var filesToLoad = [
 
     /* ReactJS */
     {
-        pattern: path.join(alloyEditorDir, 'react-with-addons.js'),
+        pattern: path.join(alloyEditorDir, 'react-with-addons-all.js'),
         included: true,
         watched: false
     },
@@ -176,7 +181,7 @@ if (process.env.SAUCE_USERNAME && process.env.SAUCE_ACCESS_KEY) {
         sl_ie_11: {
             base: 'SauceLabs',
             browserName: 'internet explorer',
-            platform: 'Windows 8.1',
+            platform: 'Windows 7',
             version: '11'
         }
     };
