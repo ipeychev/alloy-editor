@@ -2,12 +2,17 @@
     'use strict';
 
     var Selections = [{
+        name: 'embed',
+        buttons: ['embedEdit'],
+        test: AlloyEditor.SelectionTest.embed
+    }, {
         name: 'link',
         buttons: ['linkEdit'],
         test: AlloyEditor.SelectionTest.link
     }, {
         name: 'image',
-        buttons: ['imageLeft', 'imageRight'],
+        buttons: ['imageLeft', 'imageCenter', 'imageRight'],
+        setPosition: AlloyEditor.SelectionSetPosition.image,
         test: AlloyEditor.SelectionTest.image
     }, {
         name: 'text',

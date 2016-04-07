@@ -31,7 +31,7 @@
                 <li class="divider-vertical"></li>
                 <li>
                     <p class="navbar-text">
-                        API Docs for Version: <b>0.3.7</b>
+                        API Docs for Version: <b>1.0.1</b>
                     </p>
                 </li>
             </div>
@@ -65,17 +65,24 @@
                                     <li><a href="../classes/ButtonCameraImage.html">ButtonCameraImage</a></li>
                                     <li><a href="../classes/ButtonCode.html">ButtonCode</a></li>
                                     <li><a href="../classes/ButtonCommand.html">ButtonCommand</a></li>
+                                    <li><a href="../classes/ButtonCommandActive.html">ButtonCommandActive</a></li>
                                     <li><a href="../classes/ButtonCommandListItem.html">ButtonCommandListItem</a></li>
                                     <li><a href="../classes/ButtonCommandsList.html">ButtonCommandsList</a></li>
+                                    <li><a href="../classes/ButtonDropdown.html">ButtonDropdown</a></li>
+                                    <li><a href="../classes/ButtonEmbed.html">ButtonEmbed</a></li>
+                                    <li><a href="../classes/ButtonEmbedEdit.html">ButtonEmbedEdit</a></li>
                                     <li><a href="../classes/ButtonH1.html">ButtonH1</a></li>
                                     <li><a href="../classes/ButtonH2.html">ButtonH2</a></li>
                                     <li><a href="../classes/ButtonHline.html">ButtonHline</a></li>
                                     <li><a href="../classes/ButtonImage.html">ButtonImage</a></li>
+                                    <li><a href="../classes/ButtonImageAlignCenter.html">ButtonImageAlignCenter</a></li>
                                     <li><a href="../classes/ButtonImageAlignLeft.html">ButtonImageAlignLeft</a></li>
                                     <li><a href="../classes/ButtonImageAlignRight.html">ButtonImageAlignRight</a></li>
                                     <li><a href="../classes/ButtonItalic.html">ButtonItalic</a></li>
+                                    <li><a href="../classes/ButtonKeystroke.html">ButtonKeystroke</a></li>
                                     <li><a href="../classes/ButtonLink.html">ButtonLink</a></li>
                                     <li><a href="../classes/ButtonLinkEdit.html">ButtonLinkEdit</a></li>
+                                    <li><a href="../classes/ButtonLinkTargetEdit.html">ButtonLinkTargetEdit</a></li>
                                     <li><a href="../classes/ButtonOrderedList.html">ButtonOrderedList</a></li>
                                     <li><a href="../classes/ButtonParagraphAlignLeft.html">ButtonParagraphAlignLeft</a></li>
                                     <li><a href="../classes/ButtonParagraphAlignRight.html">ButtonParagraphAlignRight</a></li>
@@ -104,10 +111,14 @@
                                     <li><a href="../classes/ButtonUnderline.html">ButtonUnderline</a></li>
                                     <li><a href="../classes/ButtonUnorderedlist.html">ButtonUnorderedlist</a></li>
                                     <li><a href="../classes/CKEDITOR.Link.html">CKEDITOR.Link</a></li>
-                                    <li><a href="../classes/CKEDITOR.plugins.autolink.html">CKEDITOR.plugins.autolink</a></li>
-                                    <li><a href="../classes/CKEDITOR.plugins.placeholder.html">CKEDITOR.plugins.placeholder</a></li>
-                                    <li><a href="../classes/CKEDITOR.plugins.selectionregion.html">CKEDITOR.plugins.selectionregion</a></li>
-                                    <li><a href="../classes/CKEDITOR.plugins.uicore.html">CKEDITOR.plugins.uicore</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_autolink.html">CKEDITOR.plugins.ae_autolink</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_buttonbridge.html">CKEDITOR.plugins.ae_buttonbridge</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_panelmenubuttonbridge.html">CKEDITOR.plugins.ae_panelmenubuttonbridge</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_placeholder.html">CKEDITOR.plugins.ae_placeholder</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_richcombobridge.html">CKEDITOR.plugins.ae_richcombobridge</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_selectionregion.html">CKEDITOR.plugins.ae_selectionregion</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_uibridge.html">CKEDITOR.plugins.ae_uibridge</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_uicore.html">CKEDITOR.plugins.ae_uicore</a></li>
                                     <li><a href="../classes/CKEDITOR.Table.html">CKEDITOR.Table</a></li>
                                     <li><a href="../classes/CKEDITOR.tools.html">CKEDITOR.tools</a></li>
                                     <li><a href="../classes/Core.html">Core</a></li>
@@ -171,12 +182,53 @@
                                 var KEY_ESC = 27;
                             
                                 /**
-                                 * The ButtonEditLink class provides functionality for creating and editing a link in a document.
+                                 * The ButtonLinkEdit class provides functionality for creating and editing a link in a document.
                                  * Provides UI for creating, editing and removing a link.
                                  *
                                  * @class ButtonLinkEdit
                                  */
                                 var ButtonLinkEdit = React.createClass({
+                                    mixins: [AlloyEditor.WidgetDropdown],
+                            
+                                    // Allows validating props being passed to the component.
+                                    propTypes: {
+                                        /**
+                                         * List of the allowed values for the target attribute.
+                                         *
+                                         * @property {Array} allowedTargets
+                                         */
+                                        allowedTargets: React.PropTypes.arrayOf(React.PropTypes.object),
+                            
+                                        /**
+                                         * Indicate if we add http:// protocol to link or not
+                                         *
+                                         * @property {Boolean} appendProtocol
+                                         */
+                                         appendProtocol: React.PropTypes.bool,
+                            
+                                        /**
+                                         * The editor instance where the component is being used.
+                                         *
+                                         * @property {Object} editor
+                                         */
+                                        editor: React.PropTypes.object.isRequired,
+                            
+                                        /**
+                                         * Default value of the link target attribute.
+                                         *
+                                         * @property {String} defaultLinkTarget
+                                         */
+                                        defaultLinkTarget: React.PropTypes.string,
+                            
+                                        /**
+                                         * Indicates whether the link target selector should appear.
+                                         *
+                                         * @property {Boolean} showTargetSelector
+                                         */
+                                        showTargetSelector: React.PropTypes.bool
+                            
+                                    },
+                            
                                     // Lifecycle. Provides static properties to the widget.
                                     statics: {
                                         /**
@@ -192,18 +244,45 @@
                                     /**
                                      * Lifecycle. Invoked once, only on the client, immediately after the initial rendering occurs.
                                      *
-                                     * Focuses on the link input to immediately allow editing.
+                                     * Focuses on the link input to immediately allow editing. This should only happen if the component
+                                     * is rendered in exclusive mode to prevent aggressive focus stealing.
                                      *
                                      * @method componentDidMount
                                      */
                                     componentDidMount: function () {
-                                        // We need to wait for the next rendering cycle before focusing to avoid undesired
-                                        // scrolls on the page
-                                        if (window.requestAnimationFrame) {
-                                            window.requestAnimationFrame(this._focusLinkInput);
-                                        } else {
-                                            setTimeout(this._focusLinkInput, 0);
+                                        if (this.props.renderExclusive || this.props.manualSelection) {
+                                            // We need to wait for the next rendering cycle before focusing to avoid undesired
+                                            // scrolls on the page
+                                            if (window.requestAnimationFrame) {
+                                                window.requestAnimationFrame(this._focusLinkInput);
+                                            } else {
+                                                setTimeout(this._focusLinkInput, 0);
+                                            }
                                         }
+                                    },
+                            
+                                    /**
+                                     * Lifecycle. Invoked when a component is receiving new props.
+                                     * This method is not called for the initial render.
+                                     *
+                                     * @method componentWillReceiveProps
+                                     */
+                                    componentWillReceiveProps: function(nextProps) {
+                                        this.replaceState(this.getInitialState());
+                                    },
+                            
+                                    /**
+                                     * Lifecycle. Returns the default values of the properties used in the widget.
+                                     *
+                                     * @method getDefaultProps
+                                     * @return {Object} The default properties.
+                                     */
+                                    getDefaultProps: function() {
+                                        return {
+                                            defaultLinkTarget: &#x27;&#x27;,
+                                            showTargetSelector: true,
+                                            appendProtocol: true
+                                        };
                                     },
                             
                                     /**
@@ -215,10 +294,16 @@
                                     getInitialState: function() {
                                         var link = new CKEDITOR.Link(this.props.editor.get(&#x27;nativeEditor&#x27;)).getFromSelection();
                                         var href = link ? link.getAttribute(&#x27;href&#x27;) : &#x27;&#x27;;
+                                        var target = link ? link.getAttribute(&#x27;target&#x27;) : this.props.defaultLinkTarget;
                             
                                         return {
                                             element: link,
-                                            linkHref: href
+                                            initialLink: {
+                                                href: href,
+                                                target: target
+                                            },
+                                            linkHref: href,
+                                            linkTarget: target
                                         };
                                     },
                             
@@ -233,16 +318,33 @@
                                             opacity: this.state.linkHref ? 1 : 0
                                         };
                             
+                                        var targetSelector;
+                            
+                                        if (this.props.showTargetSelector) {
+                                            var targetSelectorProps = {
+                                                allowedTargets: this._getAllowedTargetItems(),
+                                                editor: this.props.editor,
+                                                handleLinkTargetChange: this._handleLinkTargetChange,
+                                                onDismiss: this.props.toggleDropdown,
+                                                selectedTarget: this.state.linkTarget || AlloyEditor.Strings.linkTargetDefault
+                                            };
+                            
+                                            targetSelectorProps = this.mergeDropdownProps(targetSelectorProps, AlloyEditor.ButtonLinkTargetEdit.key);
+                            
+                                            targetSelector = &lt;AlloyEditor.ButtonLinkTargetEdit {...targetSelectorProps} /&gt;;
+                                        }
+                            
                                         return (
                                             &lt;div className=&quot;ae-container-edit-link&quot;&gt;
                                                 &lt;button aria-label={AlloyEditor.Strings.removeLink} className=&quot;ae-button&quot; disabled={!this.state.element} onClick={this._removeLink} title={AlloyEditor.Strings.remove}&gt;
                                                     &lt;span className=&quot;ae-icon-unlink&quot;&gt;&lt;/span&gt;
                                                 &lt;/button&gt;
-                                                &lt;div className=&quot;ae-container-input&quot;&gt;
-                                                    &lt;input className=&quot;ae-input&quot; onChange={this._handleLinkChange} onKeyDown={this._handleKeyDown} placeholder={AlloyEditor.Strings.editLink} ref=&quot;linkInput&quot; type=&quot;text&quot; value={this.state.linkHref}&gt;&lt;/input&gt;
+                                                &lt;div className=&quot;ae-container-input xxl&quot;&gt;
+                                                    {targetSelector}
+                                                    &lt;input className=&quot;ae-input&quot; onChange={this._handleLinkHrefChange} onKeyDown={this._handleKeyDown} placeholder={AlloyEditor.Strings.editLink} ref=&quot;linkInput&quot; type=&quot;text&quot; value={this.state.linkHref}&gt;&lt;/input&gt;
                                                     &lt;button aria-label={AlloyEditor.Strings.clearInput} className=&quot;ae-button ae-icon-remove&quot; onClick={this._clearLink} style={clearLinkStyle} title={AlloyEditor.Strings.clear}&gt;&lt;/button&gt;
                                                 &lt;/div&gt;
-                                                &lt;button aria-label={AlloyEditor.Strings.confirm} className=&quot;ae-button&quot; disabled={!this.state.linkHref} onClick={this._updateLink} title={AlloyEditor.Strings.confirm}&gt;
+                                                &lt;button aria-label={AlloyEditor.Strings.confirm} className=&quot;ae-button&quot; disabled={!this._isValidState()} onClick={this._updateLink} title={AlloyEditor.Strings.confirm}&gt;
                                                     &lt;span className=&quot;ae-icon-ok&quot;&gt;&lt;/span&gt;
                                                 &lt;/button&gt;
                                             &lt;/div&gt;
@@ -270,7 +372,32 @@
                                      * @method _focusLinkInput
                                      */
                                     _focusLinkInput: function() {
-                                        React.findDOMNode(this.refs.linkInput).focus();
+                                        ReactDOM.findDOMNode(this.refs.linkInput).focus();
+                                    },
+                            
+                                    /**
+                                     * Returns an array of allowed target items. Each item consists of two properties:
+                                     * - label - the label for the item, for example &quot;_self (same tab)&quot;
+                                     * - value - the value that will be set for the link target attribute
+                                     *
+                                     * @method _getALlowedTargetItems
+                                     * @protected
+                                     * @return {Array&lt;object&gt;} An array of objects containing the allowed items.
+                                     */
+                                    _getAllowedTargetItems: function() {
+                                        return this.props.allowedLinkTargets || [{
+                                            label: AlloyEditor.Strings.linkTargetSelf,
+                                            value: &#x27;_self&#x27;
+                                        }, {
+                                            label: AlloyEditor.Strings.linkTargetBlank,
+                                            value: &#x27;_blank&#x27;
+                                        }, {
+                                            label: AlloyEditor.Strings.linkTargetParent,
+                                            value: &#x27;_parent&#x27;
+                                        }, {
+                                            label: AlloyEditor.Strings.linkTargetTop,
+                                            value: &#x27;_top&#x27;
+                                        }];
                                     },
                             
                                     /**
@@ -290,9 +417,11 @@
                                         if (event.keyCode === KEY_ENTER) {
                                             this._updateLink();
                                         } else if (event.keyCode === KEY_ESC) {
-                                            this.props.cancelExclusive();
+                                            var editor = this.props.editor.get(&#x27;nativeEditor&#x27;);
                             
-                                            this.props.editor.get(&#x27;nativeEditor&#x27;).focus();
+                                            new CKEDITOR.Link(editor).advanceSelection();
+                            
+                                            this.props.editor.get(&#x27;nativeEditor&#x27;).fire(&#x27;actionPerformed&#x27;, this);
                                         }
                                     },
                             
@@ -300,12 +429,26 @@
                                      * Updates the component state when the link input changes on user interaction.
                                      *
                                      * @protected
-                                     * @method _handleLinkChange
+                                     * @method _handleLinkHrefChange
                                      * @param {SyntheticEvent} event The change event.
                                      */
-                                    _handleLinkChange: function(event) {
+                                    _handleLinkHrefChange: function(event) {
                                         this.setState({
                                             linkHref: event.target.value
+                                        });
+                                    },
+                            
+                                    /**
+                                     * Updates the component state when the link target changes on user interaction.
+                                     *
+                                     * @protected
+                                     * @method _handleLinkTargetChange
+                                     * @param {SyntheticEvent} event The click event.
+                                     */
+                                    _handleLinkTargetChange: function(event) {
+                                        this.setState({
+                                            itemDropdown: null,
+                                            linkTarget: event.target.getAttribute(&#x27;data-value&#x27;)
                                         });
                                     },
                             
@@ -321,7 +464,7 @@
                                         var selection = editor.getSelection();
                                         var bookmarks = selection.createBookmarks();
                             
-                                        linkUtils.remove(this.state.element);
+                                        linkUtils.remove(this.state.element, { advance: true });
                             
                                         selection.selectBookmarks(bookmarks);
                             
@@ -341,13 +484,19 @@
                                      */
                                     _updateLink: function() {
                                         var editor = this.props.editor.get(&#x27;nativeEditor&#x27;);
-                                        var linkUtils = new CKEDITOR.Link(editor);
+                                        var linkUtils = new CKEDITOR.Link(editor, {appendProtocol: this.props.appendProtocol});
+                                        var linkAttrs = {
+                                            target: this.state.linkTarget
+                                        };
+                                        var modifySelection = { advance: true };
                             
                                         if (this.state.linkHref) {
                                             if (this.state.element) {
-                                                linkUtils.update(this.state.linkHref, this.state.element);
+                                                linkAttrs.href = this.state.linkHref;
+                            
+                                                linkUtils.update(linkAttrs, this.state.element, modifySelection);
                                             } else {
-                                                linkUtils.create(this.state.linkHref);
+                                                linkUtils.create(this.state.linkHref, linkAttrs, modifySelection);
                                             }
                             
                                             editor.fire(&#x27;actionPerformed&#x27;, this);
@@ -356,6 +505,25 @@
                                         // We need to cancelExclusive with the bound parameters in case the button is used
                                         // inside another in exclusive mode (such is the case of the link button)
                                         this.props.cancelExclusive();
+                                    },
+                            
+                                    /**
+                                     * Verifies that the current link state is valid so the user can save the link. A valid state
+                                     * means that we have a non-empty href and that either that or the link target are different
+                                     * from the original link.
+                                     *
+                                     * @protected
+                                     * @method _isValidState
+                                     * @return {Boolean} [description]
+                                     */
+                                    _isValidState: function() {
+                                        var validState =
+                                            this.state.linkHref &amp;&amp; (
+                                                this.state.linkHref !== this.state.initialLink.href ||
+                                                this.state.linkTarget !== this.state.initialLink.target
+                                            );
+                            
+                                        return validState;
                                     }
                                 });
                             

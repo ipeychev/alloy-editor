@@ -31,7 +31,7 @@
                 <li class="divider-vertical"></li>
                 <li>
                     <p class="navbar-text">
-                        API Docs for Version: <b>0.3.7</b>
+                        API Docs for Version: <b>1.0.1</b>
                     </p>
                 </li>
             </div>
@@ -65,17 +65,24 @@
                                     <li><a href="../classes/ButtonCameraImage.html">ButtonCameraImage</a></li>
                                     <li><a href="../classes/ButtonCode.html">ButtonCode</a></li>
                                     <li><a href="../classes/ButtonCommand.html">ButtonCommand</a></li>
+                                    <li><a href="../classes/ButtonCommandActive.html">ButtonCommandActive</a></li>
                                     <li><a href="../classes/ButtonCommandListItem.html">ButtonCommandListItem</a></li>
                                     <li><a href="../classes/ButtonCommandsList.html">ButtonCommandsList</a></li>
+                                    <li><a href="../classes/ButtonDropdown.html">ButtonDropdown</a></li>
+                                    <li><a href="../classes/ButtonEmbed.html">ButtonEmbed</a></li>
+                                    <li><a href="../classes/ButtonEmbedEdit.html">ButtonEmbedEdit</a></li>
                                     <li><a href="../classes/ButtonH1.html">ButtonH1</a></li>
                                     <li><a href="../classes/ButtonH2.html">ButtonH2</a></li>
                                     <li><a href="../classes/ButtonHline.html">ButtonHline</a></li>
                                     <li><a href="../classes/ButtonImage.html">ButtonImage</a></li>
+                                    <li><a href="../classes/ButtonImageAlignCenter.html">ButtonImageAlignCenter</a></li>
                                     <li><a href="../classes/ButtonImageAlignLeft.html">ButtonImageAlignLeft</a></li>
                                     <li><a href="../classes/ButtonImageAlignRight.html">ButtonImageAlignRight</a></li>
                                     <li><a href="../classes/ButtonItalic.html">ButtonItalic</a></li>
+                                    <li><a href="../classes/ButtonKeystroke.html">ButtonKeystroke</a></li>
                                     <li><a href="../classes/ButtonLink.html">ButtonLink</a></li>
                                     <li><a href="../classes/ButtonLinkEdit.html">ButtonLinkEdit</a></li>
+                                    <li><a href="../classes/ButtonLinkTargetEdit.html">ButtonLinkTargetEdit</a></li>
                                     <li><a href="../classes/ButtonOrderedList.html">ButtonOrderedList</a></li>
                                     <li><a href="../classes/ButtonParagraphAlignLeft.html">ButtonParagraphAlignLeft</a></li>
                                     <li><a href="../classes/ButtonParagraphAlignRight.html">ButtonParagraphAlignRight</a></li>
@@ -104,10 +111,14 @@
                                     <li><a href="../classes/ButtonUnderline.html">ButtonUnderline</a></li>
                                     <li><a href="../classes/ButtonUnorderedlist.html">ButtonUnorderedlist</a></li>
                                     <li><a href="../classes/CKEDITOR.Link.html">CKEDITOR.Link</a></li>
-                                    <li><a href="../classes/CKEDITOR.plugins.autolink.html">CKEDITOR.plugins.autolink</a></li>
-                                    <li><a href="../classes/CKEDITOR.plugins.placeholder.html">CKEDITOR.plugins.placeholder</a></li>
-                                    <li><a href="../classes/CKEDITOR.plugins.selectionregion.html">CKEDITOR.plugins.selectionregion</a></li>
-                                    <li><a href="../classes/CKEDITOR.plugins.uicore.html">CKEDITOR.plugins.uicore</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_autolink.html">CKEDITOR.plugins.ae_autolink</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_buttonbridge.html">CKEDITOR.plugins.ae_buttonbridge</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_panelmenubuttonbridge.html">CKEDITOR.plugins.ae_panelmenubuttonbridge</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_placeholder.html">CKEDITOR.plugins.ae_placeholder</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_richcombobridge.html">CKEDITOR.plugins.ae_richcombobridge</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_selectionregion.html">CKEDITOR.plugins.ae_selectionregion</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_uibridge.html">CKEDITOR.plugins.ae_uibridge</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_uicore.html">CKEDITOR.plugins.ae_uicore</a></li>
                                     <li><a href="../classes/CKEDITOR.Table.html">CKEDITOR.Table</a></li>
                                     <li><a href="../classes/CKEDITOR.tools.html">CKEDITOR.tools</a></li>
                                     <li><a href="../classes/Core.html">Core</a></li>
@@ -177,12 +188,43 @@
                                  * @param {Object} editor The CKEditor instance.
                                  */
                             
-                                function Link(editor) {
+                                function Link(editor, config) {
                                     this._editor = editor;
+                                    this.appendProtocol = config &amp;&amp; config.appendProtocol === false ? false : true;
                                 }
                             
                                 Link.prototype = {
                                     constructor: Link,
+                            
+                                    /**
+                                     * Advances the editor selection to the next available position after a
+                                     * given link or the one in the current selection.
+                                     *
+                                     * @param {CKEDITOR.dom.element} link The link element which link style should be removed.
+                                     * @method advanceSelection
+                                     */
+                                    advanceSelection: function(link) {
+                                        link = link || this.getFromSelection();
+                            
+                                        var range = this._editor.getSelection().getRanges()[0];
+                            
+                                        if (link) {
+                                            range.moveToElementEditEnd(link);
+                            
+                                            var nextNode = range.getNextEditableNode();
+                            
+                                            if (nextNode &amp;&amp; !this._editor.element.equals(nextNode.getCommonAncestor(link))) {
+                                                var whitespace = /\s/.exec(nextNode.getText());
+                            
+                                                var offset = whitespace ? whitespace.index + 1 : 0;
+                            
+                                                range.setStart(nextNode, offset);
+                                                range.setEnd(nextNode, offset);
+                                            }
+                                        }
+                            
+                                        this._editor.getSelection().selectRanges([range]);
+                                    },
                             
                                     /**
                                      * Create a link with given URI as href.
@@ -190,8 +232,9 @@
                                      * @method create
                                      * @param {String} URI The URI of the link.
                                      * @param {Object} attrs A config object with link attributes. These might be arbitrary DOM attributes.
+                                     * @param {Object} modifySelection A config object with an advance attribute to indicate if the selection should be moved after the link creation.
                                      */
-                                    create: function(URI, attrs) {
+                                    create: function(URI, attrs, modifySelection) {
                                         var selection = this._editor.getSelection();
                             
                                         var range = selection.getRanges()[0];
@@ -216,7 +259,12 @@
                             
                                         style.type = CKEDITOR.STYLE_INLINE;
                                         style.applyToRange(range, this._editor);
-                                        range.select();
+                            
+                                        if (modifySelection &amp;&amp; modifySelection.advance) {
+                                            this.advanceSelection();
+                                        } else {
+                                            range.select();
+                                        }
                                     },
                             
                                     /**
@@ -249,15 +297,20 @@
                                      * Removes a link from the editor.
                                      *
                                      * @param {CKEDITOR.dom.element} link The link element which link style should be removed.
+                                     * @param {Object} modifySelection A config object with an advance attribute to indicate if the selection should be moved after the link creation.
                                      * @method remove
                                      */
-                                    remove: function(link) {
+                                    remove: function(link, modifySelection) {
                                         var editor = this._editor;
                             
                                         if (link) {
+                                            if (modifySelection &amp;&amp; modifySelection.advance) {
+                                                this.advanceSelection();
+                                            }
+                            
                                             link.remove(editor);
                                         } else {
-                                            var style = link || new CKEDITOR.style({
+                                            var style = new CKEDITOR.style({
                                                 alwaysRemoveElement: 1,
                                                 element: &#x27;a&#x27;,
                                                 type: CKEDITOR.STYLE_INLINE
@@ -278,16 +331,45 @@
                                      * Updates the href of an already existing link.
                                      *
                                      * @method update
-                                     * @param {String} URI The new URI of the link.
+                                     * @param {Object|String} attrs The attributes to update or remove. Attributes with null values will be removed.
                                      * @param {CKEDITOR.dom.element} link The link element which href should be removed.
+                                     * @param {Object} modifySelection A config object with an advance attribute to indicate if the selection should be moved after the link creation.
                                      */
-                                    update: function(URI, link) {
-                                        var style = link || this.getFromSelection();
+                                    update: function(attrs, link, modifySelection) {
+                                        link = link || this.getFromSelection();
                             
-                                        style.setAttributes({
-                                            &#x27;data-cke-saved-href&#x27;: URI,
-                                            href: URI
-                                        });
+                                        if (typeof attrs === &#x27;string&#x27;) {
+                                            link.setAttributes({
+                                                &#x27;data-cke-saved-href&#x27;: attrs,
+                                                href: attrs
+                                            });
+                                        } else if (typeof attrs === &#x27;object&#x27;) {
+                                            var removeAttrs = [];
+                                            var setAttrs = {};
+                            
+                                            Object.keys(attrs).forEach(function(key) {
+                                                if (attrs[key] === null) {
+                                                    if (key === &#x27;href&#x27;) {
+                                                        removeAttrs.push(&#x27;data-cke-saved-href&#x27;);
+                                                    }
+                            
+                                                    removeAttrs.push(key);
+                                                } else {
+                                                    if (key === &#x27;href&#x27;) {
+                                                        setAttrs[&#x27;data-cke-saved-href&#x27;] = attrs[key];
+                                                    }
+                            
+                                                    setAttrs[key] = attrs[key];
+                                                }
+                                            });
+                            
+                                            link.removeAttributes(removeAttrs);
+                                            link.setAttributes(setAttrs);
+                                        }
+                            
+                                        if (modifySelection &amp;&amp; modifySelection.advance) {
+                                            this.advanceSelection(link);
+                                        }
                                     },
                             
                                     /**
@@ -301,7 +383,7 @@
                                      */
                                     _getCompleteURI: function(URI) {
                                         if (!REGEX_URI_SCHEME.test(URI)) {
-                                            URI = &#x27;http://&#x27; + URI;
+                                            URI = this.appendProtocol ? &#x27;http://&#x27; + URI : URI;
                                         }
                             
                                         return URI;

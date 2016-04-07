@@ -1,7 +1,7 @@
 (function() {
     'use strict';
 
-    if (CKEDITOR.plugins.get('uicore')) {
+    if (CKEDITOR.plugins.get('ae_uicore')) {
         return;
     }
 
@@ -12,21 +12,21 @@
      * execute some actions - for example to show/hide toolbars.
      *
      * By default if user presses the Esc key, 'editorInteraction' event won't be fired. However, this behaviour can be changed
-     * by setting {{#crossLink "CKEDITOR.plugins.uicore/allowEsc:attribute"}}{{/crossLink}} config property in editor's configuration to true.
+     * by setting {{#crossLink "CKEDITOR.plugins.ae_uicore/allowEsc:attribute"}}{{/crossLink}} config property in editor's configuration to true.
      *
-     * @class CKEDITOR.plugins.uicore
+     * @class CKEDITOR.plugins.ae_uicore
      */
 
     /**
      * Fired when user interacts somehow with the browser. This may be clicking with the mouse, pressing keyboard button,
      * or touching screen. This even will be not fired after each interaction. It will be debounced. By default the timeout
-     * is 50ms. This value can be overwritten via {{#crossLink "CKEDITOR.plugins.uicore/timeout:attribute"}}{{/crossLink}}
+     * is 50ms. This value can be overwritten via {{#crossLink "CKEDITOR.plugins.ae_uicore/timeout:attribute"}}{{/crossLink}}
      * property of editor's configuration, like: editor.config.uicore.timeout = 100
      *
      * @event editorInteraction
      * @param {Object} data An object which contains the following properties:
      * - nativeEvent - The event as received from CKEditor.
-     * - selectionData - The data, returned from {{#crossLink "CKEDITOR.plugins.selectionregion/getSelectionData:method"}}{{/crossLink}}
+     * - selectionData - The data, returned from {{#crossLink "CKEDITOR.plugins.ae_selectionregion/getSelectionData:method"}}{{/crossLink}}
      */
 
     /**
@@ -38,7 +38,7 @@
      */
 
     /**
-     * If set to true, the editor will still fire {{#crossLink "CKEDITOR.plugins.uicore/editorInteraction:event"}}{{/crossLink}} event,
+     * If set to true, the editor will still fire {{#crossLink "CKEDITOR.plugins.ae_uicore/editorInteraction:event"}}{{/crossLink}} event,
      * if user presses Esc key.
      *
      * @attribute allowEsc
@@ -47,7 +47,7 @@
      */
 
     /**
-     * Specifies the default timeout after which the {{#crossLink "CKEDITOR.plugins.uicore/editorInteraction:event"}}{{/crossLink}} event
+     * Specifies the default timeout after which the {{#crossLink "CKEDITOR.plugins.ae_uicore/editorInteraction:event"}}{{/crossLink}} event
      * will be fired.
      *
      * @attribute timeout
@@ -56,7 +56,7 @@
      */
 
     CKEDITOR.plugins.add(
-        'uicore', {
+        'ae_uicore', {
             /**
              * Initializer lifecycle implementation for the UICore plugin.
              *
@@ -96,6 +96,14 @@
                     uiTasksTimeout
                 );
 
+                var handleBlur = function(event) {
+                    event.removeListener('blur', handleBlur);
+                    event.removeListener('keyup', handleUI);
+                    event.removeListener('mouseup', handleUI);
+
+                    handleUI(event);
+                };
+
                 editor.on('ariaUpdate', function(event) {
                     // handleAria is debounced function, so if it is being called multiple times, it will
                     // be canceled until some time passes.
@@ -111,8 +119,13 @@
                 editor.once('contentDom', function() {
                     var editable = editor.editable();
 
-                    editable.attachListener(editable, 'mouseup', handleUI);
-                    editable.attachListener(editable, 'keyup', handleUI);
+                    editable.attachListener(editable, 'focus', function (event) {
+                        editable.attachListener(editable, 'blur', handleBlur);
+                        editable.attachListener(editable, 'keyup', handleUI);
+                        editable.attachListener(editable, 'mouseup', handleUI);
+
+                        handleUI(event);
+                    });
                 });
 
                 editor.on('destroy', function(event) {

@@ -31,7 +31,7 @@
                 <li class="divider-vertical"></li>
                 <li>
                     <p class="navbar-text">
-                        API Docs for Version: <b>0.3.7</b>
+                        API Docs for Version: <b>1.0.1</b>
                     </p>
                 </li>
             </div>
@@ -65,17 +65,24 @@
                                     <li><a href="../classes/ButtonCameraImage.html">ButtonCameraImage</a></li>
                                     <li><a href="../classes/ButtonCode.html">ButtonCode</a></li>
                                     <li><a href="../classes/ButtonCommand.html">ButtonCommand</a></li>
+                                    <li><a href="../classes/ButtonCommandActive.html">ButtonCommandActive</a></li>
                                     <li><a href="../classes/ButtonCommandListItem.html">ButtonCommandListItem</a></li>
                                     <li><a href="../classes/ButtonCommandsList.html">ButtonCommandsList</a></li>
+                                    <li><a href="../classes/ButtonDropdown.html">ButtonDropdown</a></li>
+                                    <li><a href="../classes/ButtonEmbed.html">ButtonEmbed</a></li>
+                                    <li><a href="../classes/ButtonEmbedEdit.html">ButtonEmbedEdit</a></li>
                                     <li><a href="../classes/ButtonH1.html">ButtonH1</a></li>
                                     <li><a href="../classes/ButtonH2.html">ButtonH2</a></li>
                                     <li><a href="../classes/ButtonHline.html">ButtonHline</a></li>
                                     <li><a href="../classes/ButtonImage.html">ButtonImage</a></li>
+                                    <li><a href="../classes/ButtonImageAlignCenter.html">ButtonImageAlignCenter</a></li>
                                     <li><a href="../classes/ButtonImageAlignLeft.html">ButtonImageAlignLeft</a></li>
                                     <li><a href="../classes/ButtonImageAlignRight.html">ButtonImageAlignRight</a></li>
                                     <li><a href="../classes/ButtonItalic.html">ButtonItalic</a></li>
+                                    <li><a href="../classes/ButtonKeystroke.html">ButtonKeystroke</a></li>
                                     <li><a href="../classes/ButtonLink.html">ButtonLink</a></li>
                                     <li><a href="../classes/ButtonLinkEdit.html">ButtonLinkEdit</a></li>
+                                    <li><a href="../classes/ButtonLinkTargetEdit.html">ButtonLinkTargetEdit</a></li>
                                     <li><a href="../classes/ButtonOrderedList.html">ButtonOrderedList</a></li>
                                     <li><a href="../classes/ButtonParagraphAlignLeft.html">ButtonParagraphAlignLeft</a></li>
                                     <li><a href="../classes/ButtonParagraphAlignRight.html">ButtonParagraphAlignRight</a></li>
@@ -104,10 +111,14 @@
                                     <li><a href="../classes/ButtonUnderline.html">ButtonUnderline</a></li>
                                     <li><a href="../classes/ButtonUnorderedlist.html">ButtonUnorderedlist</a></li>
                                     <li><a href="../classes/CKEDITOR.Link.html">CKEDITOR.Link</a></li>
-                                    <li><a href="../classes/CKEDITOR.plugins.autolink.html">CKEDITOR.plugins.autolink</a></li>
-                                    <li><a href="../classes/CKEDITOR.plugins.placeholder.html">CKEDITOR.plugins.placeholder</a></li>
-                                    <li><a href="../classes/CKEDITOR.plugins.selectionregion.html">CKEDITOR.plugins.selectionregion</a></li>
-                                    <li><a href="../classes/CKEDITOR.plugins.uicore.html">CKEDITOR.plugins.uicore</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_autolink.html">CKEDITOR.plugins.ae_autolink</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_buttonbridge.html">CKEDITOR.plugins.ae_buttonbridge</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_panelmenubuttonbridge.html">CKEDITOR.plugins.ae_panelmenubuttonbridge</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_placeholder.html">CKEDITOR.plugins.ae_placeholder</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_richcombobridge.html">CKEDITOR.plugins.ae_richcombobridge</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_selectionregion.html">CKEDITOR.plugins.ae_selectionregion</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_uibridge.html">CKEDITOR.plugins.ae_uibridge</a></li>
+                                    <li><a href="../classes/CKEDITOR.plugins.ae_uicore.html">CKEDITOR.plugins.ae_uicore</a></li>
                                     <li><a href="../classes/CKEDITOR.Table.html">CKEDITOR.Table</a></li>
                                     <li><a href="../classes/CKEDITOR.tools.html">CKEDITOR.tools</a></li>
                                     <li><a href="../classes/Core.html">Core</a></li>
@@ -172,6 +183,64 @@
                                  *
                                  * @class CKEDITOR.tools
                                  */
+                            
+                                /**
+                                 * Sends a request using the JSONP technique.
+                                 *
+                                 * @method CKEDITOR.tools.jsonp
+                                 * @static
+                                 * @param {CKEDITOR.template} urlTemplate The template of the URL to be requested. All properties
+                                 * passed in &#x60;urlParams&#x60; can be used, plus a &#x60;{callback}&#x60;, which represent a JSONP callback, must be defined.
+                                 * @param {Object} urlParams Parameters to be passed to the &#x60;urlTemplate&#x60;.
+                                 * @param {Function} callback A function to be called in case of success.
+                                 * @param {Function} errorCallback A function to be called in case of failure.
+                                 * @return {Object} An object with the following properties:
+                                 * - id: the transaction ID
+                                 * - a &#x60;cancel()&#x60; method
+                                 */
+                                CKEDITOR.tools.jsonp = function(urlTemplate, urlParams, callback, errorCallback) {
+                                    var callbackKey = CKEDITOR.tools.getNextNumber();
+                            
+                                    urlParams = urlParams || {};
+                                    urlParams.callback = &#x27;CKEDITOR._.jsonpCallbacks[&#x27; + callbackKey + &#x27;]&#x27;;
+                            
+                                    if (!CKEDITOR._.jsonpCallbacks) {
+                                        CKEDITOR._.jsonpCallbacks = {};
+                                    }
+                            
+                                    CKEDITOR._.jsonpCallbacks[callbackKey] = function(response) {
+                                        setTimeout(function() {
+                                            cleanUp();
+                            
+                                            callback(response);
+                                        });
+                                    };
+                            
+                                    var scriptElement = new CKEDITOR.dom.element(&#x27;script&#x27;);
+                                    scriptElement.setAttribute(&#x27;src&#x27;, urlTemplate.output(urlParams));
+                                    scriptElement.on(&#x27;error&#x27;, function() {
+                                        cleanUp();
+                            
+                                        if (errorCallback) {
+                                            errorCallback();
+                                        }
+                                    });
+                            
+                                    function cleanUp() {
+                                        if (scriptElement) {
+                                            scriptElement.remove();
+                                            delete CKEDITOR._.jsonpCallbacks[callbackKey];
+                                            scriptElement = null;
+                                        }
+                                    }
+                            
+                                    CKEDITOR.document.getBody().append(scriptElement);
+                            
+                                    return {
+                                        cancel: cleanUp,
+                                        id: callbackKey
+                                    };
+                                };
                             
                                 /**
                                  * Returns a new object containing all of the properties of all the supplied
