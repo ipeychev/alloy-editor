@@ -23,7 +23,7 @@
          *
          * It depends on the props editorEvent to analyze the following user-interaction parameters:
          * - {Object} selectionData The data about the selection in the editor as returned from
-         * {{#crossLink "CKEDITOR.plugins.selectionregion/getSelectionData:method"}}{{/crossLink}}
+         * {{#crossLink "CKEDITOR.plugins.ae_selectionregion/getSelectionData:method"}}{{/crossLink}}
          * - {Number} pos Contains the coordinates of the position, considered as most appropriate.
          * This may be the point where the user released the mouse, or just the beginning or the end of
          * the selection.
@@ -41,9 +41,10 @@
             }
 
             var selectionData = eventPayload.selectionData;
+
             var pos = {
                 x: eventPayload.nativeEvent.pageX,
-                y: eventPayload.nativeEvent.pageY
+                y: selectionData.region.top
             };
 
             var direction = selectionData.region.direction;
@@ -91,7 +92,7 @@
          * @protected
          * @method _getXPoint
          * @param {Object} selectionData The data about the selection in the editor as
-         * returned from {{#crossLink "CKEDITOR.plugins.selectionregion/getSelectionData:method"}}{{/crossLink}}
+         * returned from {{#crossLink "CKEDITOR.plugins.ae_selectionregion/getSelectionData:method"}}{{/crossLink}}
          * @param {Object} eventX The X coordinate received from the native event (mouseup).
          * @return {Number} The calculated X point in page coordinates.
          */

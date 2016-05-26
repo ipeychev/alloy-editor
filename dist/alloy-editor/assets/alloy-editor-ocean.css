@@ -10,6 +10,7 @@
 }
 
 [class*="ae-icon-"], [class*=" ae-icon-"] {
+	display: block;
 	font-family: 'alloyeditor-ocean';
 	speak: none;
 	font-size: 20px;
@@ -49,108 +50,132 @@
 	content: "\";
 }
 
-.ae-icon-bold:before {
+.ae-icon-audio:before {
 	content: "\";
 }
 
-.ae-icon-bulleted-list:before {
+.ae-icon-bin:before {
 	content: "\";
 }
 
-.ae-icon-camera:before {
+.ae-icon-bold:before {
 	content: "\";
 }
 
-.ae-icon-cell:before {
+.ae-icon-bulleted-list:before {
 	content: "\";
 }
 
-.ae-icon-close:before {
+.ae-icon-camera:before {
 	content: "\";
 }
 
-.ae-icon-code:before {
+.ae-icon-cell:before {
 	content: "\";
 }
 
-.ae-icon-column:before {
+.ae-icon-close:before {
 	content: "\";
 }
 
-.ae-icon-h1:before {
+.ae-icon-code:before {
 	content: "\";
 }
 
-.ae-icon-h2:before {
+.ae-icon-column:before {
 	content: "\";
 }
 
-.ae-icon-image:before {
+.ae-icon-embed:before {
 	content: "\";
 }
 
-.ae-icon-italic:before {
+.ae-icon-h1:before {
 	content: "\";
 }
 
-.ae-icon-link:before {
+.ae-icon-h2:before {
 	content: "\";
 }
 
-.ae-icon-numbered-list:before {
+.ae-icon-image:before {
 	content: "\";
 }
 
-.ae-icon-ok:before {
+.ae-icon-indent-block:before {
 	content: "\";
 }
 
-.ae-icon-quote:before {
+.ae-icon-italic:before {
 	content: "\";
 }
 
-.ae-icon-remove:before {
+.ae-icon-link:before {
 	content: "\";
 }
 
-.ae-icon-removeformat:before {
+.ae-icon-numbered-list:before {
 	content: "\";
 }
 
-.ae-icon-row:before {
+.ae-icon-ok:before {
 	content: "\";
 }
 
-.ae-icon-separator:before {
+.ae-icon-outdent-block:before {
 	content: "\";
 }
 
-.ae-icon-strike:before {
+.ae-icon-quote:before {
 	content: "\";
 }
 
-.ae-icon-subscript:before {
+.ae-icon-remove:before {
 	content: "\";
 }
 
-.ae-icon-superscript:before {
+.ae-icon-removeformat:before {
 	content: "\";
 }
 
-.ae-icon-table:before {
+.ae-icon-row:before {
 	content: "\";
 }
 
-.ae-icon-twitter:before {
+.ae-icon-separator:before {
 	content: "\";
 }
 
-.ae-icon-underline:before {
+.ae-icon-strike:before {
 	content: "\";
 }
 
-.ae-icon-unlink:before {
+.ae-icon-subscript:before {
 	content: "\";
+}
+
+.ae-icon-superscript:before {
+	content: "\";
+}
+
+.ae-icon-table:before {
+	content: "\";
+}
+
+.ae-icon-twitter:before {
+	content: "\";
+}
+
+.ae-icon-underline:before {
+	content: "\";
+}
+
+.ae-icon-unlink:before {
+	content: "\";
+}
+
+.ae-icon-video:before {
+	content: "\";
 }
 @charset "UTF-8";
 /** GENERAL VARIABLES */
@@ -343,7 +368,7 @@
   .ae-ui .ae-container-edit-link label, .ae-ui .ae-container-edit-table label {
     padding: 0;
     position: relative \9;
-    top: 50% \9;
+    top: 25% \9;
     transform: translateY(-50%) \9; }
   .ae-ui .ae-container-edit-link IE10-PLUS::-ms-reveal, .ae-ui .ae-container-edit-link label, .ae-ui .ae-container-edit-table IE10-PLUS::-ms-reveal, .ae-ui .ae-container-edit-table label {
     top: 0;
@@ -358,6 +383,8 @@
   -ms-flex-wrap: nowrap;
   flex-wrap: nowrap;
   width: 192px; }
+  .ae-ui .ae-container-input.xxl {
+    width: 336px; }
   .ae-ui .ae-container-input.medium {
     width: 72px; }
   .ae-ui .ae-container-input.small {
@@ -375,10 +402,9 @@
     max-width: 100%;
     padding: 0 0 0 4px;
     display: inline-block \9;
-    margin-left: -10px \9;
-    margin-top: 10px \9;
-    padding-left: 10px \9;
     width: 168px \9; }
+  .ae-ui .ae-container-input .ae-container-dropdown {
+    padding-left: 10px; }
   .ae-ui .ae-container-input .ae-icon-remove {
     float: right \9; }
 
@@ -400,7 +426,10 @@
         -ms-transform: rotate(90deg);
         -o-transform: rotate(90deg);
         transform: rotate(90deg);
-        float: right \9; }
+        float: right \9;
+        position: absolute \9;
+        right: 0 \9;
+        top: 0 \9; }
       .ae-ui .ae-container-dropdown > .ae-toolbar-element .ae-container .ae-container-dropdown-selected-item, .ae-ui [class^=ae-container-dropdown-] > .ae-toolbar-element .ae-container .ae-container-dropdown-selected-item {
         -webkit-box-flex: 1;
         -moz-box-flex: 1;
@@ -410,19 +439,30 @@
         -ms-flex: 1;
         flex: 1;
         display: inline-block;
-        line-height: 2;
+        line-height: 24px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        position: relative \9;
-        top: 50% \9;
-        transform: translateY(-50%) \9; }
+        position: relative \9; }
       .ae-ui .ae-container-dropdown > .ae-toolbar-element .ae-container IE10-PLUS::-ms-reveal, .ae-ui .ae-container-dropdown > .ae-toolbar-element .ae-container .ae-container-dropdown-selected-item, .ae-ui [class^=ae-container-dropdown-] > .ae-toolbar-element .ae-container IE10-PLUS::-ms-reveal, .ae-ui [class^=ae-container-dropdown-] > .ae-toolbar-element .ae-container .ae-container-dropdown-selected-item {
         top: 0;
         transform: translateY(0); }
 
+.ae-ui .ae-container-dropdown-small {
+  width: 48px !important; }
+
+.ae-ui .ae-container-dropdown-medium {
+  width: 96px !important; }
+
 .ae-ui .ae-container-dropdown-xl {
   width: 192px !important; }
+
+.ae-ui .ae-button-bridge [class*="ae-icon-"], .ae-ui .ae-button-bridge [class*=" ae-icon-"] {
+  background-repeat: no-repeat;
+  display: block;
+  height: 16px;
+  width: 16px;
+  margin-left: 4px; }
 
 .ae-ui .ae-has-dropdown {
   display: block;
@@ -510,7 +550,7 @@
 .ae-twitter-link {
   background-color: #f8f8f8; }
   .ae-twitter-link:after {
-    content: "";
+    content: "";
     font-family: alloyeditor-ocean; }
 
 .ae-ui .ae-arrow-box.ae-arrow-box-bottom:after {
@@ -545,6 +585,9 @@
     color: #000;
     font-size: 24px;
     line-height: 24px; }
+  .ae-ui .ae-container-input .ae-container-dropdown {
+    background-color: #fff;
+    color: #000; }
   .ae-ui .ae-container-input input, .ae-ui .ae-container-input .ae-input {
     border-radius: 0;
     border-width: 0;
@@ -565,6 +608,13 @@
       box-shadow: none; }
     .ae-ui .ae-container-input input::-ms-clear, .ae-ui .ae-container-input .ae-input::-ms-clear {
       display: none; }
+
+.ae-ui .ae-button-bridge [class*="ae-icon-"], .ae-ui .ae-button-bridge [class*=" ae-icon-"] {
+  -webkit-filter: brightness(0) invert(100%);
+  filter: brightness(0) invert(100%); }
+  .ae-ui .ae-button-bridge [class*="ae-icon-"]:hover, .ae-ui .ae-button-bridge [class*=" ae-icon-"]:hover {
+    -webkit-filter: sepia(80%) hue-rotate(-20deg) invert(90%) saturate(8);
+    filter: sepia(80%) hue-rotate(-20deg) invert(90%) saturate(8); }
 
 .ae-ui .ae-dropdown, .ae-ui [class^=ae-dropdown-] {
   background-color: #fcfcfc;

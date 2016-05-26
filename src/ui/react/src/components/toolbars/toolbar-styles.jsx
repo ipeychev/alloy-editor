@@ -54,7 +54,7 @@
             onDismiss: React.PropTypes.func,
 
             /**
-             * The data, returned from {{#crossLink "CKEDITOR.plugins.selectionregion/getSelectionData:method"}}{{/crossLink}}
+             * The data, returned from {{#crossLink "CKEDITOR.plugins.ae_selectionregion/getSelectionData:method"}}{{/crossLink}}
              *
              * @property {Object} selectionData
              */
@@ -104,7 +104,7 @@
         getDefaultProps: function() {
             return {
                 circular: true,
-                descendants: '.ae-button, .ae-toolbar-element',
+                descendants: '.ae-input, .ae-button:not([disabled]), .ae-toolbar-element',
                 keys: {
                     dismiss: [27],
                     next: [39, 40],
@@ -121,10 +121,6 @@
          * @return {Object|null} The content which should be rendered.
          */
         render: function() {
-            if (this.props.editorEvent && !this.props.editorEvent.data.nativeEvent.target.isContentEditable) {
-                return null;
-            }
-
             var currentSelection = this._getCurrentSelection();
 
             if (currentSelection) {
@@ -142,6 +138,7 @@
                 var buttons = this.getToolbarButtons(
                     currentSelection.buttons,
                     {
+                        manualSelection: this.props.editorEvent ? this.props.editorEvent.data.manualSelection : null,
                         selectionType: currentSelection.name
                     }
                 );
@@ -209,7 +206,7 @@
                     var result;
 
                     if (testFn) {
-                        result = testFn({
+                        result = eventPayload.manualSelection === item.name || testFn({
                             data: eventPayload,
                             editor: this.props.editor
                         });
@@ -234,7 +231,7 @@
          */
         _updatePosition: function() {
             // If component is not mounted, there is nothing to do
-            if (!React.findDOMNode(this)) {
+            if (!ReactDOM.findDOMNode(this)) {
                 return;
             }
 

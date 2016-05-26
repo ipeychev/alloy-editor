@@ -5,7 +5,7 @@ var del = require('del');
 var es = require('event-stream');
 var fs = require('fs');
 var gulp = require('gulp');
-var minifyCSS = require('gulp-minify-css');
+var minifyCSS = require('gulp-cssnano');
 var path = require('path');
 var rename = require('gulp-rename');
 var runSequence = require('run-sequence');
@@ -79,5 +79,7 @@ gulp.task('minimize-css', function() {
 gulp.task('clean-fonts', function(callback) {
     del([
         path.join(editorDistFolder, 'assets/css')
-    ], callback);
+    ]).then(function() {
+        callback();
+    });
 });
