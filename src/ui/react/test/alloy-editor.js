@@ -39,6 +39,14 @@
             it('should set contenteditable to true', function() {
                 assert.isTrue(this.el.isContentEditable);
             });
+
+            it('should set contenteditable attribute to false on editor destroying', function() {
+                var editable = this.alloyEditor.get('nativeEditor').editable();
+
+                this.alloyEditor.destroy();
+                this.alloyEditor = null;
+                assert.strictEqual('false', editable.getAttribute('contenteditable'));
+            });
         });
 
         describe('with enableContentEditable set to true', function() {
@@ -55,6 +63,14 @@
             it('should set contenteditable to true', function() {
                 assert.isTrue(this.el.isContentEditable);
             });
+
+            it('should set contenteditable attribute to false on editor destroying', function() {
+                var editable = this.alloyEditor.get('nativeEditor').editable();
+
+                this.alloyEditor.destroy();
+                this.alloyEditor = null;
+                assert.strictEqual('false', editable.getAttribute('contenteditable'));
+            });
         });
 
         describe('with enableContentEditable set to false', function() {
@@ -70,6 +86,14 @@
 
             it('should not force the srcNode to be contenteditable', function() {
                 assert.isFalse(this.el.isContentEditable);
+            });
+
+            it('should leave contenteditable attribute to false on editor destroying', function() {
+                var editable = this.alloyEditor.get('nativeEditor').editable();
+
+                this.alloyEditor.destroy();
+                this.alloyEditor = null;
+                assert.strictEqual('false', editable.getAttribute('contenteditable'));
             });
         });
 
@@ -92,6 +116,119 @@
                 this.alloyEditor.destroy();
                 this.alloyEditor = null;
                 assert.isFalse(editable.hasClass('ae-editable'));
+            });
+        });
+
+        describe('UI component integration', function() {
+            beforeEach(function(done) {
+                initEditor.call(this, done);
+            });
+
+            afterEach(function() {
+                cleanUpEditor.call(this);
+            });
+
+            it('should fire an editorUpdate event when the component state changes', function(done) {
+                var onEditorUpdate = sinon.stub();
+
+                var alloyEditor = this.alloyEditor;
+
+                var nativeEditor = alloyEditor.get('nativeEditor');
+
+                nativeEditor.on('editorUpdate', onEditorUpdate);
+
+                nativeEditor.on('uiReady', function() {
+                    alloyEditor._mainUI.setState({hidden: true});
+
+                    assert.ok(onEditorUpdate.calledOnce);
+
+                    done();
+                });
+            });
+        });
+
+        describe('with readOnly set to false', function() {
+            beforeEach(function(done) {
+                initEditor.call(this, done);
+            });
+
+            afterEach(function() {
+                cleanUpEditor.call(this);
+            });
+
+            it('should not redirect when clicking on links', function() {
+                var spy = sinon.spy(this.alloyEditor, '_redirectLink');
+
+                bender.tools.selection.setWithHtml(this.alloyEditor.get('nativeEditor'), '<a id="link_foo" href="foo.com">Foo</a>');
+
+                happen.click(document.getElementById('link_foo'));
+
+                assert.isFalse(spy.called);
+            });
+
+            it('should redirect when clicking on links and readonly has been changed to true', function() {
+                var nativeEditor = this.alloyEditor.get('nativeEditor');
+
+                nativeEditor.setReadOnly(true);
+
+                // Stub `_redirectLink` method to avoid page refreshes during the test
+                var stub = sinon.stub(this.alloyEditor, '_redirectLink');
+
+                bender.tools.selection.setWithHtml(nativeEditor, '<a id="link_foo" href="foo.com">Foo</a>');
+
+                happen.click(document.getElementById('link_foo'));
+
+                assert.isTrue(stub.calledOnce);
+            });
+        });
+
+        describe('with readonly set to true', function() {
+            beforeEach(function(done) {
+                initEditor.call(this, done, {
+                    readOnly: true
+                });
+            });
+
+            afterEach(function() {
+                cleanUpEditor.call(this);
+            });
+
+            it('should open a new window when clicking in links with a target attribute', function() {
+                var stub = sinon.stub(window, 'open');
+
+                bender.tools.selection.setWithHtml(this.alloyEditor.get('nativeEditor'), '<a id="link_foo" href="foo.com" target="_blank">Foo</a>');
+
+                happen.click(document.getElementById('link_foo'));
+
+                stub.restore();
+
+                assert.isTrue(stub.calledOnce);
+            });
+
+            it('should update the current window url when clicking in links without a target attribute', function() {
+                var locationHref = window.location.href;
+
+                bender.tools.selection.setWithHtml(this.alloyEditor.get('nativeEditor'), '<a id="link_foo" href="#foo">Foo</a>');
+
+                happen.click(document.getElementById('link_foo'));
+
+                assert.strictEqual(window.location.href, locationHref + '#foo');
+            });
+
+            it('should not redirect when clicking on links and readonly has been set to', function() {
+                var nativeEditor = this.alloyEditor.get('nativeEditor');
+
+                nativeEditor.setReadOnly(false);
+
+                var stub = sinon.stub(this.alloyEditor, '_redirectLink');
+
+                bender.tools.selection.setWithHtml(nativeEditor, '<a id="link_foo" href="foo.com">Foo</a>');
+
+                var link = document.getElementById('link_foo');
+
+                happen.click(link);
+
+                assert.strictEqual(0, stub.callCount);
             });
         });
 

@@ -9,7 +9,10 @@
 (function() {
     'use strict';
 
-    var PLUGIN_NAME = 'dragresize';
+    if (CKEDITOR.plugins.get('ae_dragresize')) {
+        return;
+    }
+
     var IMAGE_SNAP_TO_SIZE = 7;
 
     var isWebkit = ('WebkitAppearance' in document.documentElement.style);
@@ -22,7 +25,7 @@
     /**
      * Initializes the plugin
      */
-    CKEDITOR.plugins.add(PLUGIN_NAME, {
+    CKEDITOR.plugins.add('ae_dragresize', {
         onLoad: function() {
             if (!isWebkit) {
                 return;
@@ -56,6 +59,7 @@
 
         function selectionChange() {
             var selection = editor.getSelection();
+
             if (!selection) return;
             // If an element is selected and that element is an IMG
             if (selection.getType() !== CKEDITOR.SELECTION_NONE && selection.getStartElement().is('img')) {
@@ -95,6 +99,14 @@
         editor.on('beforeModeUnload', function self() {
             editor.removeListener('beforeModeUnload', self);
             resizer.hide();
+        });
+
+        editor.on('destroy', function() {
+            var resizeElement = document.getElementById('ckimgrsz');
+
+            if (resizeElement) {
+                resizeElement.remove();
+            }
         });
 
         // Update the selection when the browser window is resized
@@ -143,7 +155,9 @@
         isHandle: function(el) {
             var handles = this.handles;
             for (var n in handles) {
-                if (handles[n] === el) return true;
+                if (handles[n] === el) {
+                    return true;
+                }
             }
             return false;
         },

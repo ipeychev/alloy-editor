@@ -1,21 +1,245 @@
 /**
- * AlloyEditor v0.3.7.
+ * AlloyEditor v1.2.3
  *
- * Copyright 2014-2015, Liferay, Inc.
+ * Copyright 2014-present, Liferay, Inc.
  * All rights reserved.
  *
  * This source code is licensed under the GNU LGPL-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
 
-CKEDITOR.disableAutoInline = true;
-
 (function() {
-    if (window.AlloyEditor) {
-        return;
+    'use strict';
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol ? "symbol" : typeof obj; };
+
+(function () {
+    'use strict';
+
+    /**
+     * AlloyEditor static object.
+     *
+     * @class AlloyEditor
+     * @type {Object}
+     */
+
+    var AlloyEditor = {
+        /**
+         * Creates an instance of AlloyEditor.
+         *
+         * @method editable
+         * @static
+         * @param {String|Node} node The Node ID or HTMl node, which AlloyEditor should use as an editable area.
+         * @param {Object} config Configuration attributes for the current instance of AlloyEditor.
+         * @return {Object} An instance of {{#crossLink "Core"}}{{/crossLink}}
+         */
+        editable: function editable(node, config) {
+            config = config || {};
+            config.srcNode = node;
+
+            AlloyEditor.implementEventTarget();
+
+            return new AlloyEditor.Core(config);
+        },
+
+        /**
+         * The full URL for the AlloyEditor installation directory.
+         * It is possible to manually provide the base path by setting a
+         * global variable named `ALLOYEDITOR_BASEPATH`. This global variable
+         * must be set **before** the editor script loading.
+         *
+         * @method getBasePath
+         * @static
+         * @return {String} The found base path
+         */
+        getBasePath: function getBasePath() {
+            // Find out the editor directory path, based on its <script> tag.
+            var path = window.ALLOYEDITOR_BASEPATH || '';
+
+            if (!path) {
+                var scripts = document.getElementsByTagName('script');
+
+                for (var i = 0; i < scripts.length; i++) {
+                    var match = scripts[i].src.match(AlloyEditor.regexBasePath);
+
+                    if (match) {
+                        path = match[1];
+                        break;
+                    }
+                }
+            }
+
+            // In IE (only) the script.src string is the raw value entered in the
+            // HTML source. Other browsers return the full resolved URL instead.
+            if (path.indexOf(':/') === -1 && path.slice(0, 2) !== '//') {
+                // Absolute path.
+                if (path.indexOf('/') === 0) {
+                    path = location.href.match(/^.*?:\/\/[^\/]*/)[0] + path;
+                }
+                // Relative path.
+                else {
+                        path = location.href.match(/^[^\?]*\/(?:)/)[0] + path;
+                    }
+            }
+
+            if (!path) {
+                throw 'The AlloyEditor installation path could not be automatically detected. Please set the global variable "ALLOYEDITOR_BASEPATH" before creating editor instances.';
+            }
+
+            return path;
+        },
+
+        /**
+         * Detects and load the corresponding language file if AlloyEditor language strings are not already present.
+         * The function fires a {{#crossLink "AlloyEditor/languageResourcesLoaded:event"}}{{/crossLink}} event
+         *
+         * @method loadLanguageResources
+         * @static
+         * @param {Function} callback Optional callback to be called when AlloyEditor loads the language resource.
+         */
+        loadLanguageResources: function loadLanguageResources(callback) {
+            AlloyEditor.implementEventTarget();
+
+            if (AlloyEditor.Lang.isFunction(callback)) {
+                if (AlloyEditor.Strings) {
+                    setTimeout(callback, 0);
+                } else {
+                    AlloyEditor.once('languageResourcesLoaded', callback);
+                }
+            }
+
+            if (!AlloyEditor._langResourceRequested) {
+                AlloyEditor._langResourceRequested = true;
+
+                var languages = ['af', 'ar', 'bg', 'bn', 'bs', 'ca', 'cs', 'cy', 'da', 'de', 'el', 'en-au', 'en-ca', 'en-gb', 'en', 'eo', 'es', 'et', 'eu', 'fa', 'fi', 'fo', 'fr-ca', 'fr', 'gl', 'gu', 'he', 'hi', 'hr', 'hu', 'id', 'is', 'it', 'ja', 'ka', 'km', 'ko', 'ku', 'lt', 'lv', 'mk', 'mn', 'ms', 'nb', 'nl', 'no', 'pl', 'pt-br', 'pt', 'ro', 'ru', 'si', 'sk', 'sl', 'sq', 'sr-latn', 'sr', 'sv', 'th', 'tr', 'tt', 'ug', 'uk', 'vi', 'zh-cn', 'zh'];
+
+                var userLanguage = navigator.language || navigator.userLanguage || 'en';
+
+                var parts = userLanguage.toLowerCase().match(/([a-z]+)(?:-([a-z]+))?/);
+                var lang = parts[1];
+                var locale = parts[2];
+
+                if (languages.indexOf(lang + '-' + locale) >= 0) {
+                    lang = lang + '-' + locale;
+                } else if (languages.indexOf(lang) === -1) {
+                    lang = 'en';
+                }
+
+                CKEDITOR.scriptLoader.load(AlloyEditor.getUrl('lang/alloy-editor/' + lang + '.js'), function (loaded) {
+                    if (loaded) {
+                        AlloyEditor.fire('languageResourcesLoaded');
+                    }
+                }, this);
+            }
+        },
+
+        /**
+         * Gets the full URL for AlloyEditor resources. By default, URLs
+         * returned by this function contain a querystring parameter ("t")
+         * set to the {@link CKEDITOR#timestamp} value.
+         *
+         * @method getUrl
+         * @static
+         * @param {String} resource The resource whose full URL we want to get.
+         * It may be a full, absolute, or relative URL.
+         * @return {String} The full URL.
+         */
+        getUrl: function getUrl(resource) {
+            var basePath = AlloyEditor.getBasePath();
+
+            // If this is not a full or absolute path.
+            if (resource.indexOf(':/') === -1 && resource.indexOf('/') !== 0) {
+                resource = basePath + resource;
+            }
+
+            // Add the timestamp, except for directories.
+            if (CKEDITOR.timestamp && resource.charAt(resource.length - 1) !== '/' && !/[&?]t=/.test(resource)) {
+                resource += (resource.indexOf('?') >= 0 ? '&' : '?') + 't=' + CKEDITOR.timestamp;
+            }
+
+            return resource;
+        },
+
+        /**
+         * Implements event firing and subscribing via CKEDITOR.event.
+         *
+         * @method implementEventTarget
+         * @static
+         */
+        implementEventTarget: function implementEventTarget() {
+            if (!AlloyEditor.fire && !AlloyEditor.on) {
+                CKEDITOR.event.implementOn(AlloyEditor);
+            }
+        },
+
+        /**
+         * Regular expression which should match the script which have been used to load AlloyEditor.
+         *
+         * @property regexBasePath
+         * @type {RegExp}
+         * @static
+         */
+        regexBasePath: /(^|.*[\\\/])(?:alloy-editor[^/]+|alloy-editor)\.js(?:\?.*|;.*)?$/i,
+
+        /**
+         * And object, containing all currently registered buttons in AlloyEditor.
+         *
+         * @property Buttons
+         * @type {Object}
+         * @static
+         */
+        Buttons: {},
+
+        /**
+         * And object, containing all currently registered toolbars in AlloyEditor.
+         *
+         * @property Toolbars
+         * @type {Object}
+         * @static
+         */
+        Toolbars: {}
+
+        /**
+         * Fired when AlloyEditor detects the browser language and loads the corresponding language file. Once this event
+         * is fired, AlloyEditor.Strings will be populated with data.
+         *
+         * @event languageResourcesLoaded
+         */
+    };
+
+    if (typeof module !== 'undefined' && _typeof(module.exports) === 'object') {
+        module.exports = AlloyEditor;
     }
 
-    'use strict';
+    if (typeof window !== 'undefined') {
+        window.AlloyEditor = AlloyEditor;
+    } else if (typeof global !== 'undefined') {
+        global.AlloyEditor = AlloyEditor;
+    } else if (typeof self !== 'undefined') {
+        self.AlloyEditor = AlloyEditor;
+    } else {
+        this.AlloyEditor = AlloyEditor;
+    }
+})();
+
+    var React = (function() {
+    	return (0, eval)('this').React;
+    }());
+
+    if (typeof React === 'undefined') {
+        React = AlloyEditor.React;
+    }
+
+    var ReactDOM = (function() {
+        return (0, eval)('this').ReactDOM;
+    }());
+
+    if (typeof React === 'undefined') {
+        ReactDOM = AlloyEditor.ReactDOM;
+    }
+
+    if (typeof window !== 'undefined') {
+        'use strict';
 
 (function () {
     'use strict';
@@ -40,6 +264,7 @@ CKEDITOR.disableAutoInline = true;
      * @param {Object} context The context in which the callback will be called. This argument is optional.
      * @param {Array} args An array of arguments which the callback will receive.
      */
+
     CKEDITOR.tools.debounce = CKEDITOR.tools.debounce || function (callback, timeout, context, args) {
         var debounceHandle;
 
@@ -70,9 +295,12 @@ CKEDITOR.disableAutoInline = true;
 })();
 'use strict';
 
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol ? "symbol" : typeof obj; };
+
 (function () {
     'use strict';
 
+    var REGEX_EMAIL_SCHEME = /^[a-z0-9\u0430-\u044F\._-]+@/i;
     var REGEX_URI_SCHEME = /^(?:[a-z][a-z0-9+\-.]*)\:|^\//i;
 
     /**
@@ -83,12 +311,43 @@ CKEDITOR.disableAutoInline = true;
      * @param {Object} editor The CKEditor instance.
      */
 
-    function Link(editor) {
+    function Link(editor, config) {
         this._editor = editor;
+        this.appendProtocol = config && config.appendProtocol === false ? false : true;
     }
 
     Link.prototype = {
         constructor: Link,
+
+        /**
+         * Advances the editor selection to the next available position after a
+         * given link or the one in the current selection.
+         *
+         * @param {CKEDITOR.dom.element} link The link element which link style should be removed.
+         * @method advanceSelection
+         */
+        advanceSelection: function advanceSelection(link) {
+            link = link || this.getFromSelection();
+
+            var range = this._editor.getSelection().getRanges()[0];
+
+            if (link) {
+                range.moveToElementEditEnd(link);
+
+                var nextNode = range.getNextEditableNode();
+
+                if (nextNode && !this._editor.element.equals(nextNode.getCommonAncestor(link))) {
+                    var whitespace = /\s/.exec(nextNode.getText());
+
+                    var offset = whitespace ? whitespace.index + 1 : 0;
+
+                    range.setStart(nextNode, offset);
+                    range.setEnd(nextNode, offset);
+                }
+            }
+
+            this._editor.getSelection().selectRanges([range]);
+        },
 
         /**
          * Create a link with given URI as href.
@@ -96,8 +355,9 @@ CKEDITOR.disableAutoInline = true;
          * @method create
          * @param {String} URI The URI of the link.
          * @param {Object} attrs A config object with link attributes. These might be arbitrary DOM attributes.
+         * @param {Object} modifySelection A config object with an advance attribute to indicate if the selection should be moved after the link creation.
          */
-        create: function create(URI, attrs) {
+        create: function create(URI, attrs, modifySelection) {
             var selection = this._editor.getSelection();
 
             var range = selection.getRanges()[0];
@@ -122,7 +382,12 @@ CKEDITOR.disableAutoInline = true;
 
             style.type = CKEDITOR.STYLE_INLINE;
             style.applyToRange(range, this._editor);
-            range.select();
+
+            if (modifySelection && modifySelection.advance) {
+                this.advanceSelection();
+            } else {
+                range.select();
+            }
         },
 
         /**
@@ -155,15 +420,20 @@ CKEDITOR.disableAutoInline = true;
          * Removes a link from the editor.
          *
          * @param {CKEDITOR.dom.element} link The link element which link style should be removed.
+         * @param {Object} modifySelection A config object with an advance attribute to indicate if the selection should be moved after the link creation.
          * @method remove
          */
-        remove: function remove(link) {
+        remove: function remove(link, modifySelection) {
             var editor = this._editor;
 
             if (link) {
+                if (modifySelection && modifySelection.advance) {
+                    this.advanceSelection();
+                }
+
                 link.remove(editor);
             } else {
-                var style = link || new CKEDITOR.style({
+                var style = new CKEDITOR.style({
                     alwaysRemoveElement: 1,
                     element: 'a',
                     type: CKEDITOR.STYLE_INLINE
@@ -184,21 +454,52 @@ CKEDITOR.disableAutoInline = true;
          * Updates the href of an already existing link.
          *
          * @method update
-         * @param {String} URI The new URI of the link.
+         * @param {Object|String} attrs The attributes to update or remove. Attributes with null values will be removed.
          * @param {CKEDITOR.dom.element} link The link element which href should be removed.
+         * @param {Object} modifySelection A config object with an advance attribute to indicate if the selection should be moved after the link creation.
          */
-        update: function update(URI, link) {
-            var style = link || this.getFromSelection();
+        update: function update(attrs, link, modifySelection) {
+            link = link || this.getFromSelection();
 
-            style.setAttributes({
-                'data-cke-saved-href': URI,
-                href: URI
-            });
+            if (typeof attrs === 'string') {
+                link.setAttributes({
+                    'data-cke-saved-href': attrs,
+                    href: attrs
+                });
+            } else if ((typeof attrs === 'undefined' ? 'undefined' : _typeof(attrs)) === 'object') {
+                var removeAttrs = [];
+                var setAttrs = {};
+
+                Object.keys(attrs).forEach(function (key) {
+                    if (attrs[key] === null) {
+                        if (key === 'href') {
+                            removeAttrs.push('data-cke-saved-href');
+                        }
+
+                        removeAttrs.push(key);
+                    } else {
+                        if (key === 'href') {
+                            setAttrs['data-cke-saved-href'] = attrs[key];
+                        }
+
+                        setAttrs[key] = attrs[key];
+                    }
+                });
+
+                link.removeAttributes(removeAttrs);
+                link.setAttributes(setAttrs);
+            }
+
+            if (modifySelection && modifySelection.advance) {
+                this.advanceSelection(link);
+            }
         },
 
         /**
-         * Checks if the URI has a scheme. If not, the default 'http' scheme with
-         * hierarchical path '//' is added to it.
+         * Checks if the URI has an '@' symbol. If it does and the URI looks like an email
+         * and doesn't have 'mailto:', 'mailto:' is added to the URI.
+         * If it doesn't and the URI doesn't have a scheme, the default 'http' scheme with
+         * hierarchical path '//' is added to the URI.
          *
          * @protected
          * @method _getCompleteURI
@@ -206,8 +507,10 @@ CKEDITOR.disableAutoInline = true;
          * @return {String} The URI updated with the protocol.
          */
         _getCompleteURI: function _getCompleteURI(URI) {
-            if (!REGEX_URI_SCHEME.test(URI)) {
-                URI = 'http://' + URI;
+            if (REGEX_EMAIL_SCHEME.test(URI)) {
+                URI = 'mailto:' + URI;
+            } else if (!REGEX_URI_SCHEME.test(URI)) {
+                URI = this.appendProtocol ? 'http://' + URI : URI;
             }
 
             return URI;
@@ -221,7 +524,7 @@ CKEDITOR.disableAutoInline = true;
 (function () {
     'use strict';
 
-    if (CKEDITOR.plugins.get('selectionregion')) {
+    if (CKEDITOR.plugins.get('ae_selectionregion')) {
         return;
     }
 
@@ -236,7 +539,7 @@ CKEDITOR.disableAutoInline = true;
      * be merged into each editor instance, so the developer may use them directly via the editor, without making
      * an instance of this class**.
      *
-     * @class CKEDITOR.plugins.selectionregion
+     * @class CKEDITOR.plugins.ae_selectionregion
      * @constructor
      */
     function SelectionRegion() {}
@@ -333,23 +636,35 @@ CKEDITOR.disableAutoInline = true;
         getCaretRegion: function getCaretRegion() {
             var selection = this.getSelection();
 
+            var region = {
+                bottom: 0,
+                left: 0,
+                right: 0,
+                top: 0
+            };
+
             var bookmarks = selection.createBookmarks();
+
+            if (!bookmarks.length) {
+                return region;
+            }
+
             var bookmarkNodeEl = bookmarks[0].startNode.$;
 
             bookmarkNodeEl.style.display = 'inline-block';
 
-            var region = new CKEDITOR.dom.element(bookmarkNodeEl).getClientRect();
+            region = new CKEDITOR.dom.element(bookmarkNodeEl).getClientRect();
 
             bookmarkNodeEl.parentNode.removeChild(bookmarkNodeEl);
 
             var scrollPos = new CKEDITOR.dom.window(window).getScrollPosition();
 
-            return {
-                bottom: scrollPos.y + region.bottom,
-                left: scrollPos.x + region.left,
-                right: scrollPos.x + region.right,
-                top: scrollPos.y + region.top
-            };
+            region.bottom = scrollPos.y + region.bottom;
+            region.left = scrollPos.x + region.left;
+            region.right = scrollPos.x + region.right;
+            region.top = scrollPos.y + region.top;
+
+            return region;
         },
 
         /**
@@ -359,7 +674,7 @@ CKEDITOR.disableAutoInline = true;
          * @return {Object|null} Returns an object with the following data:
          * - element - The currently selected element, if any
          * - text - The selected text
-         * - region - The data, returned from {{#crossLink "CKEDITOR.plugins.selectionregion/getSelectionRegion:method"}}{{/crossLink}}
+         * - region - The data, returned from {{#crossLink "CKEDITOR.plugins.ae_selectionregion/getSelectionRegion:method"}}{{/crossLink}}
          */
         getSelectionData: function getSelectionData() {
             var selection = this.getSelection();
@@ -383,7 +698,7 @@ CKEDITOR.disableAutoInline = true;
          *
          * @method getSelectionRegion
          * @return {Object} Returns object which is being returned from
-         * {{#crossLink "CKEDITOR.plugins.selectionregion/getClientRectsRegion:method"}}{{/crossLink}} with three more properties:
+         * {{#crossLink "CKEDITOR.plugins.ae_selectionregion/getClientRectsRegion:method"}}{{/crossLink}} with three more properties:
          * - direction - the direction of the selection. Can be one of these:
          *   1. CKEDITOR.SELECTION_TOP_TO_BOTTOM
          *   2. CKEDITOR.SELECTION_BOTTOM_TO_TOP
@@ -571,7 +886,7 @@ CKEDITOR.disableAutoInline = true;
         }
     };
 
-    CKEDITOR.plugins.add('selectionregion', {
+    CKEDITOR.plugins.add('ae_selectionregion', {
         /**
          * Initializer lifecycle implementation for the SelectionRegion plugin.
          *
@@ -596,6 +911,18 @@ CKEDITOR.disableAutoInline = true;
 
 (function () {
     'use strict';
+
+    var IE_NON_DIRECTLY_EDITABLE_ELEMENT = {
+        'table': 1,
+        'col': 1,
+        'colgroup': 1,
+        'tbody': 1,
+        'td': 1,
+        'tfoot': 1,
+        'th': 1,
+        'thead': 1,
+        'tr': 1
+    };
 
     /**
      * Table class utility. Provides methods for create, delete and update tables.
@@ -688,6 +1015,31 @@ CKEDITOR.disableAutoInline = true;
             }
 
             return table;
+        },
+
+        /**
+         * Checks if a given table can be considered as editable. This method
+         * workarounds a limitation of IE where for some elements (like table),
+         * `isContentEditable` returns always false. This is because IE does not support
+         * `contenteditable` on such elements. However, despite such elements
+         * cannot be set as content editable directly, a content editable SPAN,
+         * or DIV element can be placed inside the individual table cells.
+         * See https://msdn.microsoft.com/en-us/library/ms537837%28v=VS.85%29.aspx
+         *
+         * @method isEditable
+         * @param {CKEDITOR.dom.element} el The table element to test if editable
+         * @return {Boolean}
+         */
+        isEditable: function isEditable(el) {
+            if (!CKEDITOR.env.ie || !el.is(IE_NON_DIRECTLY_EDITABLE_ELEMENT)) {
+                return !el.isReadOnly();
+            }
+
+            if (el.hasAttribute('contenteditable')) {
+                return el.getAttribute('contenteditable') !== 'false';
+            }
+
+            return this.isEditable(el.getParent());
         },
 
         /**
@@ -917,6 +1269,65 @@ CKEDITOR.disableAutoInline = true;
      */
 
     /**
+     * Sends a request using the JSONP technique.
+     *
+     * @method CKEDITOR.tools.jsonp
+     * @static
+     * @param {CKEDITOR.template} urlTemplate The template of the URL to be requested. All properties
+     * passed in `urlParams` can be used, plus a `{callback}`, which represent a JSONP callback, must be defined.
+     * @param {Object} urlParams Parameters to be passed to the `urlTemplate`.
+     * @param {Function} callback A function to be called in case of success.
+     * @param {Function} errorCallback A function to be called in case of failure.
+     * @return {Object} An object with the following properties:
+     * - id: the transaction ID
+     * - a `cancel()` method
+     */
+
+    CKEDITOR.tools.jsonp = function (urlTemplate, urlParams, callback, errorCallback) {
+        var callbackKey = CKEDITOR.tools.getNextNumber();
+
+        urlParams = urlParams || {};
+        urlParams.callback = 'CKEDITOR._.jsonpCallbacks[' + callbackKey + ']';
+
+        if (!CKEDITOR._.jsonpCallbacks) {
+            CKEDITOR._.jsonpCallbacks = {};
+        }
+
+        CKEDITOR._.jsonpCallbacks[callbackKey] = function (response) {
+            setTimeout(function () {
+                cleanUp();
+
+                callback(response);
+            });
+        };
+
+        var scriptElement = new CKEDITOR.dom.element('script');
+        scriptElement.setAttribute('src', urlTemplate.output(urlParams));
+        scriptElement.on('error', function () {
+            cleanUp();
+
+            if (errorCallback) {
+                errorCallback();
+            }
+        });
+
+        function cleanUp() {
+            if (scriptElement) {
+                scriptElement.remove();
+                delete CKEDITOR._.jsonpCallbacks[callbackKey];
+                scriptElement = null;
+            }
+        }
+
+        CKEDITOR.document.getBody().append(scriptElement);
+
+        return {
+            cancel: cleanUp,
+            id: callbackKey
+        };
+    };
+
+    /**
      * Returns a new object containing all of the properties of all the supplied
      * objects. The properties from later objects will overwrite those in earlier
      * objects.
@@ -963,7 +1374,7 @@ CKEDITOR.disableAutoInline = true;
 (function () {
     'use strict';
 
-    if (CKEDITOR.plugins.get('uicore')) {
+    if (CKEDITOR.plugins.get('ae_uicore')) {
         return;
     }
 
@@ -974,21 +1385,21 @@ CKEDITOR.disableAutoInline = true;
      * execute some actions - for example to show/hide toolbars.
      *
      * By default if user presses the Esc key, 'editorInteraction' event won't be fired. However, this behaviour can be changed
-     * by setting {{#crossLink "CKEDITOR.plugins.uicore/allowEsc:attribute"}}{{/crossLink}} config property in editor's configuration to true.
+     * by setting {{#crossLink "CKEDITOR.plugins.ae_uicore/allowEsc:attribute"}}{{/crossLink}} config property in editor's configuration to true.
      *
-     * @class CKEDITOR.plugins.uicore
+     * @class CKEDITOR.plugins.ae_uicore
      */
 
     /**
      * Fired when user interacts somehow with the browser. This may be clicking with the mouse, pressing keyboard button,
      * or touching screen. This even will be not fired after each interaction. It will be debounced. By default the timeout
-     * is 50ms. This value can be overwritten via {{#crossLink "CKEDITOR.plugins.uicore/timeout:attribute"}}{{/crossLink}}
+     * is 50ms. This value can be overwritten via {{#crossLink "CKEDITOR.plugins.ae_uicore/timeout:attribute"}}{{/crossLink}}
      * property of editor's configuration, like: editor.config.uicore.timeout = 100
      *
      * @event editorInteraction
      * @param {Object} data An object which contains the following properties:
      * - nativeEvent - The event as received from CKEditor.
-     * - selectionData - The data, returned from {{#crossLink "CKEDITOR.plugins.selectionregion/getSelectionData:method"}}{{/crossLink}}
+     * - selectionData - The data, returned from {{#crossLink "CKEDITOR.plugins.ae_selectionregion/getSelectionData:method"}}{{/crossLink}}
      */
 
     /**
@@ -1000,7 +1411,7 @@ CKEDITOR.disableAutoInline = true;
      */
 
     /**
-     * If set to true, the editor will still fire {{#crossLink "CKEDITOR.plugins.uicore/editorInteraction:event"}}{{/crossLink}} event,
+     * If set to true, the editor will still fire {{#crossLink "CKEDITOR.plugins.ae_uicore/editorInteraction:event"}}{{/crossLink}} event,
      * if user presses Esc key.
      *
      * @attribute allowEsc
@@ -1009,7 +1420,7 @@ CKEDITOR.disableAutoInline = true;
      */
 
     /**
-     * Specifies the default timeout after which the {{#crossLink "CKEDITOR.plugins.uicore/editorInteraction:event"}}{{/crossLink}} event
+     * Specifies the default timeout after which the {{#crossLink "CKEDITOR.plugins.ae_uicore/editorInteraction:event"}}{{/crossLink}} event
      * will be fired.
      *
      * @attribute timeout
@@ -1017,7 +1428,7 @@ CKEDITOR.disableAutoInline = true;
      * @type Number
      */
 
-    CKEDITOR.plugins.add('uicore', {
+    CKEDITOR.plugins.add('ae_uicore', {
         /**
          * Initializer lifecycle implementation for the UICore plugin.
          *
@@ -1031,10 +1442,6 @@ CKEDITOR.disableAutoInline = true;
             var ariaElement = this._createAriaElement(editor.id);
 
             var uiTasksTimeout = editor.config.uicore ? editor.config.uicore.timeout : 50;
-
-            var handleAria = CKEDITOR.tools.debounce(function (event) {
-                ariaElement.innerHTML = ariaState.join('. ');
-            }, uiTasksTimeout);
 
             var handleUI = CKEDITOR.tools.debounce(function (event) {
                 ariaState = [];
@@ -1051,6 +1458,38 @@ CKEDITOR.disableAutoInline = true;
                 }
             }, uiTasksTimeout);
 
+            var handleAria = CKEDITOR.tools.debounce(function (event) {
+                ariaElement.innerHTML = ariaState.join('. ');
+            }, uiTasksTimeout);
+
+            var handleMouseLeave = CKEDITOR.tools.debounce(function (event) {
+                var aeUINodes = document.querySelectorAll('.ae-ui');
+
+                var found;
+
+                for (var i = 0; i < aeUINodes.length; i++) {
+                    if (aeUINodes[i].contains(event.data.$.relatedTarget)) {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    handleUI(event);
+                }
+            }, uiTasksTimeout);
+
+            var handleBlur = function handleBlur(event) {
+                var editable = editor.editable();
+
+                editable.removeListener('blur', handleBlur);
+                editable.removeListener('keyup', handleUI);
+                editable.removeListener('mouseleave', handleMouseLeave);
+                editable.removeListener('mouseup', handleUI);
+
+                handleUI(event);
+            };
+
             editor.on('ariaUpdate', function (event) {
                 // handleAria is debounced function, so if it is being called multiple times, it will
                 // be canceled until some time passes.
@@ -1066,8 +1505,14 @@ CKEDITOR.disableAutoInline = true;
             editor.once('contentDom', function () {
                 var editable = editor.editable();
 
-                editable.attachListener(editable, 'mouseup', handleUI);
-                editable.attachListener(editable, 'keyup', handleUI);
+                editable.attachListener(editable, 'focus', function (event) {
+                    editable.attachListener(editable, 'blur', handleBlur);
+                    editable.attachListener(editable, 'keyup', handleUI);
+                    editable.attachListener(editable, 'mouseup', handleUI);
+                    editable.attachListener(editable, 'mouseleave', handleMouseLeave);
+
+                    handleUI(event);
+                });
             });
 
             editor.on('destroy', function (event) {
@@ -1107,15 +1552,23 @@ CKEDITOR.disableAutoInline = true;
 
     var isIE = CKEDITOR.env.ie;
 
-    if (CKEDITOR.plugins.get('addimages')) {
+    if (CKEDITOR.plugins.get('ae_addimages')) {
         return;
     }
 
     /**
      * CKEditor plugin which allows Drag&Drop of images directly into the editable area. The image will be encoded
-     * as Data URI. An event `imageAdd` will be fired with the inserted element into the editable area.
+     * as Data URI. An event `beforeImageAdd` will be fired with the list of dropped images. If any of the listeners
+     * returns `false` or cancels the event, the images won't be added to the content. Otherwise,
+     * an event `imageAdd` will be fired with the inserted element into the editable area.
      *
-     * @class CKEDITOR.plugins.addimages
+     * @class CKEDITOR.plugins.ae_addimages
+     */
+
+    /**
+     * Fired before adding images to the editor.
+     * @event beforeImageAdd
+     * @param {Array} imageFiles Array of image files
      */
 
     /**
@@ -1123,9 +1576,10 @@ CKEDITOR.disableAutoInline = true;
      *
      * @event imageAdd
      * @param {CKEDITOR.dom.element} el The created image with src as Data URI
+     * @param {File} file The image file
      */
 
-    CKEDITOR.plugins.add('addimages', {
+    CKEDITOR.plugins.add('ae_addimages', {
         /**
          * Initialization of the plugin, part of CKEditor plugin lifecycle.
          * The function registers a 'dragenter', 'dragover', 'drop' and `paste` events on the editing area.
@@ -1134,7 +1588,7 @@ CKEDITOR.disableAutoInline = true;
          * @param {Object} editor The current editor instance
          */
         init: function init(editor) {
-            editor.once('contentDom', (function () {
+            editor.once('contentDom', function () {
                 var editable = editor.editable();
 
                 editable.attachListener(editable, 'dragenter', this._onDragEnter, this, {
@@ -1152,12 +1606,12 @@ CKEDITOR.disableAutoInline = true;
                 editable.attachListener(editable, 'paste', this._onPaste, this, {
                     editor: editor
                 });
-            }).bind(this));
+            }.bind(this));
         },
 
         /**
          * Accepts an array of dropped files to the editor. Then, it filters the images and sends them for further
-         * processing to {{#crossLink "CKEDITOR.plugins.addimages/_processFile:method"}}{{/crossLink}}
+         * processing to {{#crossLink "CKEDITOR.plugins.ae_addimages/_processFile:method"}}{{/crossLink}}
          *
          * @protected
          * @method _handleFiles
@@ -1165,15 +1619,53 @@ CKEDITOR.disableAutoInline = true;
          * @param {Object} editor The current editor instance
          */
         _handleFiles: function _handleFiles(files, editor) {
-            for (var i = 0; i < files.length; i++) {
-                var file = files[i];
+            var file;
+            var i;
+
+            var imageFiles = [];
+
+            for (i = 0; i < files.length; i++) {
+                file = files[i];
 
                 if (file.type.indexOf('image') === 0) {
+                    imageFiles.push(file);
+                }
+            }
+
+            var result = editor.fire('beforeImageAdd', {
+                imageFiles: imageFiles
+            });
+
+            if (!!result) {
+                for (i = 0; i < files.length; i++) {
+                    file = files[i];
+
                     this._processFile(file, editor);
                 }
             }
 
             return false;
+        },
+
+        /**
+         * Handles drag drop event. The function will create a selection from the current
+         * point and will send a list of files to be processed to
+         * {{#crossLink "CKEDITOR.plugins.ae_addimages/_handleFiles:method"}}{{/crossLink}} method.
+         *
+         * @protected
+         * @method _onDragDrop
+         * @param {CKEDITOR.dom.event} event dragdrop event, as received natively from CKEditor
+         */
+        _onDragDrop: function _onDragDrop(event) {
+            var nativeEvent = event.data.$;
+
+            new CKEDITOR.dom.event(nativeEvent).preventDefault();
+
+            var editor = event.listenerData.editor;
+
+            event.listenerData.editor.createSelectionFromPoint(nativeEvent.clientX, nativeEvent.clientY);
+
+            this._handleFiles(nativeEvent.dataTransfer.files, editor);
         },
 
         /**
@@ -1203,36 +1695,15 @@ CKEDITOR.disableAutoInline = true;
         },
 
         /**
-         * Handles drag drop event. The function will create selection from the current points and
-         * will send a list of files to be processed to
-         * {{#crossLink "CKEDITOR.plugins.addimages/_handleFiles:method"}}{{/crossLink}}
-         *
-         * @protected
-         * @method _onDragDrop
-         * @param {CKEDITOR.dom.event} event dragdrop event, as received natively from CKEditor
-         */
-        _onDragDrop: function _onDragDrop(event) {
-            var nativeEvent = event.data.$;
-
-            new CKEDITOR.dom.event(nativeEvent).preventDefault();
-
-            var editor = event.listenerData.editor;
-
-            event.listenerData.editor.createSelectionFromPoint(nativeEvent.clientX, nativeEvent.clientY);
-
-            this._handleFiles(nativeEvent.dataTransfer.files, editor);
-        },
-
-        /**
          * Checks if the pasted data is image and passes it to
-         * {{#crossLink "CKEDITOR.plugins.addimages/_processFile:method"}}{{/crossLink}} for processing.
+         * {{#crossLink "CKEDITOR.plugins.ae_addimages/_processFile:method"}}{{/crossLink}} for processing.
          *
          * @method _onPaste
          * @protected
          * @param {CKEDITOR.dom.event} event A `paste` event, as received natively from CKEditor
          */
         _onPaste: function _onPaste(event) {
-            if (event.data.$.clipboardData) {
+            if (event.data && event.data.$ && event.data.$.clipboardData && event.data.$.clipboardData.items && event.data.$.clipboardData.items.length > 0) {
                 var pastedData = event.data.$.clipboardData.items[0];
 
                 if (pastedData.type.indexOf('image') === 0) {
@@ -1292,7 +1763,7 @@ CKEDITOR.disableAutoInline = true;
 (function () {
     'use strict';
 
-    if (CKEDITOR.plugins.get('autolink')) {
+    if (CKEDITOR.plugins.get('ae_autolink')) {
         return;
     }
 
@@ -1321,10 +1792,10 @@ CKEDITOR.disableAutoInline = true;
     /**
      * CKEditor plugin which automatically generates links when user types text which looks like URL.
      *
-     * @class CKEDITOR.plugins.autolink
+     * @class CKEDITOR.plugins.ae_autolink
      * @constructor
      */
-    CKEDITOR.plugins.add('autolink', {
+    CKEDITOR.plugins.add('ae_autolink', {
 
         /**
          * Initialization of the plugin, part of CKEditor plugin lifecycle.
@@ -1334,13 +1805,13 @@ CKEDITOR.disableAutoInline = true;
          * @param {Object} editor The current editor instance
          */
         init: function init(editor) {
-            editor.once('contentDom', (function () {
+            editor.once('contentDom', function () {
                 var editable = editor.editable();
 
                 editable.attachListener(editable, 'keyup', this._onKeyUp, this, {
                     editor: editor
                 });
-            }).bind(this));
+            }.bind(this));
         },
 
         /**
@@ -1491,6 +1962,9 @@ CKEDITOR.disableAutoInline = true;
             ckLink.create(content);
             this._ckLink = ckLink;
 
+            var linkNode = ckLink.getFromSelection();
+            editor.fire('autolinkAdd', linkNode);
+
             this._subscribeToKeyEvent(editor);
 
             // Now range is on the link and it is selected. We have to
@@ -1513,6 +1987,13 @@ CKEDITOR.disableAutoInline = true;
 
             range.select();
         },
+
+        /**
+         * Fired when a URL is detected in text and converted to a link.
+         *
+         * @event autolinkAdd
+         * @param {CKEDITOR.dom.element} el Node of the created link.
+         */
 
         /**
          * Removes the created link element, and replaces it by its text.
@@ -1559,6 +2040,169 @@ CKEDITOR.disableAutoInline = true;
         }
     });
 })();
+'use strict';
+
+(function () {
+  'use strict';
+
+  if (CKEDITOR.plugins.get('ae_autolist')) {
+    return;
+  }
+
+  var KEY_BACK = 8;
+
+  var KEY_SPACE = 32;
+
+  var DEFAULT_CONFIG = [{
+    regex: /^\*$/,
+    type: 'bulletedlist'
+  }, {
+    regex: /^1\.$/,
+    type: 'numberedlist'
+  }];
+
+  /**
+      * CKEditor plugin which automatically generates ordered/unordered list when user types text which looks like a list.
+      *
+      * @class CKEDITOR.plugins.ae_autolist
+      * @constructor
+      */
+  CKEDITOR.plugins.add('ae_autolist', {
+
+    /**
+    * Initialization of the plugin, part of CKeditor plugin lifecycle.
+    * The function registers the `keydown` event on the content editing area.
+    *
+    * @method init
+    * @param {Object} editor The current editor instance
+    */
+    init: function init(editor) {
+      editor.once('contentDom', function () {
+        var editable = editor.editable();
+
+        editable.attachListener(editable, 'keydown', this._onKeyDown, this, {
+          editor: editor
+        });
+      }.bind(this));
+    },
+
+    /**
+    * Checks for pressing the `Backspace` key in order to undo the list creation.
+    *
+    * @protected
+    * @method _checkForBackspaceAndUndo
+    * @param {Event} event Event object
+    */
+    _checkForBackspaceAndUndo: function _checkForBackspaceAndUndo(event) {
+      var editor = event.listenerData.editor;
+
+      var nativeEvent = event.data.$;
+
+      var editable = editor.editable();
+
+      editable.removeListener('keydown', this._checkForBackspaceAndUndo);
+
+      if (nativeEvent.keyCode === KEY_BACK) {
+        editor.execCommand('undo');
+        editor.insertHtml(event.listenerData.bullet + '&nbsp;');
+        event.data.preventDefault();
+      }
+    },
+
+    /**
+    * Checks current line to find match with MATCHES object to create OL or UL.
+    *
+    * @protected
+    * @method _checkLine
+    * @param {editor} Editor object
+    * @return {Object|null} Returns an object which contains the detected list config if any
+    */
+    _getListConfig: function _getListConfig(editor) {
+      var configRegex = editor.config.autolist || DEFAULT_CONFIG;
+
+      var range = editor.getSelection().getRanges()[0];
+
+      var textContainer = range.endContainer.getText();
+
+      var bullet = textContainer.substring(0, range.startOffset);
+
+      var text = textContainer.substring(range.startOffset, textContainer.length);
+
+      var index = 0;
+
+      var regexLen = configRegex.length;
+
+      var autolistCfg = null;
+
+      while (!autolistCfg && regexLen > index) {
+        var regexItem = configRegex[index];
+
+        if (regexItem.regex.test(bullet)) {
+          autolistCfg = {
+            bullet: bullet,
+            editor: editor,
+            text: text,
+            type: regexItem.type
+          };
+
+          break;
+        }
+
+        index++;
+      }
+
+      return autolistCfg;
+    },
+
+    /**
+    * Create list with different types: Bulleted or Numbered list
+    *
+    * @protected
+    * @method _createList
+    * @param {Object} listConfig Object that contains bullet, text and type for creating the list
+    */
+    _createList: function _createList(listConfig) {
+      var editor = listConfig.editor;
+
+      var range = editor.getSelection().getRanges()[0];
+
+      range.endContainer.setText(listConfig.text);
+      editor.execCommand(listConfig.type);
+
+      var editable = editor.editable();
+
+      // Subscribe to keydown in order to check if the next key press is `Backspace`.
+      // If so, the creation of the list will be discarded.
+      editable.attachListener(editable, 'keydown', this._checkForBackspaceAndUndo, this, {
+        editor: editor,
+        bullet: listConfig.bullet
+      }, 1);
+    },
+
+    /**
+              * Listens to the `Space` key events to check if the last word
+              * introduced by the user should be replaced by a list (OL or UL)
+              *
+              * @protected
+              * @method _onKeyDown
+              * @param {Event} event Event object
+              */
+    _onKeyDown: function _onKeyDown(event) {
+      var nativeEvent = event.data.$;
+
+      if (nativeEvent.keyCode === KEY_SPACE) {
+        var listConfig = this._getListConfig(event.listenerData.editor);
+
+        if (listConfig) {
+          event.data.preventDefault();
+          this._createList(listConfig);
+        }
+      }
+    }
+  });
+})();
+'use strict';
+
 /**
  * CKEditor plugin: Dragable image resizing
  * https://github.com/sstur/ck-dragresize
@@ -1567,15 +2211,16 @@ CKEDITOR.disableAutoInline = true;
  * - Snap to size of other images in editor
  * - Escape while dragging cancels resize
  */
-'use strict';
-
 (function () {
     'use strict';
 
-    var PLUGIN_NAME = 'dragresize';
+    if (CKEDITOR.plugins.get('ae_dragresize')) {
+        return;
+    }
+
     var IMAGE_SNAP_TO_SIZE = 7;
 
-    var isWebkit = ('WebkitAppearance' in document.documentElement.style);
+    var isWebkit = 'WebkitAppearance' in document.documentElement.style;
 
     if (isWebkit) {
         // CSS is added in a compressed form
@@ -1585,7 +2230,7 @@ CKEDITOR.disableAutoInline = true;
     /**
      * Initializes the plugin
      */
-    CKEDITOR.plugins.add(PLUGIN_NAME, {
+    CKEDITOR.plugins.add('ae_dragresize', {
         onLoad: function onLoad() {
             if (!isWebkit) {
                 return;
@@ -1619,6 +2264,7 @@ CKEDITOR.disableAutoInline = true;
 
         function selectionChange() {
             var selection = editor.getSelection();
+
             if (!selection) return;
             // If an element is selected and that element is an IMG
             if (selection.getType() !== CKEDITOR.SELECTION_NONE && selection.getStartElement().is('img')) {
@@ -1658,6 +2304,14 @@ CKEDITOR.disableAutoInline = true;
         editor.on('beforeModeUnload', function self() {
             editor.removeListener('beforeModeUnload', self);
             resizer.hide();
+        });
+
+        editor.on('destroy', function () {
+            var resizeElement = document.getElementById('ckimgrsz');
+
+            if (resizeElement) {
+                resizeElement.remove();
+            }
         });
 
         // Update the selection when the browser window is resized
@@ -1706,7 +2360,9 @@ CKEDITOR.disableAutoInline = true;
         isHandle: function isHandle(el) {
             var handles = this.handles;
             for (var n in handles) {
-                if (handles[n] === el) return true;
+                if (handles[n] === el) {
+                    return true;
+                }
             }
             return false;
         },
@@ -1982,15 +2638,378 @@ CKEDITOR.disableAutoInline = true;
 (function () {
     'use strict';
 
-    if (CKEDITOR.plugins.get('pasteimages')) {
+    /* istanbul ignore if */
+
+    if (CKEDITOR.plugins.get('ae_embed')) {
+        return;
+    }
+
+    var REGEX_HTTP = /^https?/;
+
+    CKEDITOR.DEFAULT_AE_EMBED_URL_TPL = '//alloy.iframe.ly/api/oembed?url={url}&callback={callback}';
+    CKEDITOR.DEFAULT_AE_EMBED_WIDGET_TPL = '<div data-ae-embed-url="{url}"></div>';
+
+    /**
+     * CKEditor plugin which adds the infrastructure to embed urls as media objects using an oembed
+     * service. By default, and for demoing purposes only, the oembed service is hosted in iframe.ly
+     * at //alloy.iframe.ly/api/oembed?url={url}&callback={callback}. Note this should be changed to
+     * a self-hosted or paid service in production environments. Access to the alloy.iframe.ly endpoint
+     * may be restricted per domain due to significant traffic.
+     *
+     * This plugin adds an `embedUrl` command that can be used to easily embed a URL and transform it
+     * to an embedded content.
+     *
+     * @class CKEDITOR.plugins.ae_embed
+     */
+    CKEDITOR.plugins.add('ae_embed', {
+        requires: 'widget',
+        init: function init(editor) {
+            var AE_EMBED_URL_TPL = new CKEDITOR.template(editor.config.embedUrlTemplate || CKEDITOR.DEFAULT_AE_EMBED_URL_TPL);
+            var AE_EMBED_WIDGET_TPL = new CKEDITOR.template(editor.config.embedWidgetTpl || CKEDITOR.DEFAULT_AE_EMBED_WIDGET_TPL);
+
+            // Default function to upcast DOM elements to embed widgets.
+            // It matches CKEDITOR.DEFAULT_AE_EMBED_WIDGET_TPL
+            var defaultEmbedWidgetUpcastFn = function defaultEmbedWidgetUpcastFn(element, data) {
+                if (element.name === 'div' && element.attributes['data-ae-embed-url']) {
+                    data.url = element.attributes['data-ae-embed-url'];
+
+                    return true;
+                }
+            };
+
+            // Create a embedUrl command that can be invoked to easily embed media URLs
+            editor.addCommand('embedUrl', {
+                exec: function exec(editor, data) {
+                    editor.insertHtml(AE_EMBED_WIDGET_TPL.output({
+                        url: data.url
+                    }));
+                }
+            });
+
+            // Create a widget to properly handle embed operations
+            editor.widgets.add('ae_embed', {
+                allowedContent: 'div[!data-ae-embed-url]',
+                mask: true,
+                requiredContent: 'div[data-ae-embed-url]',
+
+                /**
+                 * Listener to be executed every time the widget's data changes. It takes care of
+                 * requesting the embed object to the configured oembed service and render it in
+                 * the editor
+                 *
+                 * @method data
+                 * @param {event} event Data change event
+                 */
+                data: function data(event) {
+                    var widget = this;
+                    var url = event.data.url;
+
+                    if (url) {
+                        CKEDITOR.tools.jsonp(AE_EMBED_URL_TPL, {
+                            url: encodeURIComponent(url)
+                        }, function (response) {
+                            if (response.html) {
+                                widget.element.setHtml(response.html);
+                            } else {
+                                widget.element.setHtml(url);
+                            }
+                        }, function (msg) {
+                            widget.element.setHtml(url);
+                        });
+                    }
+                },
+
+                /**
+                 * Function used to upcast an element to ae_embed widgets.
+                 *
+                 * @method upcast
+                 * @param {CKEDITOR.htmlParser.element} element The element to be checked
+                 * @param {Object} data The object that will be passed to the widget
+                 */
+                upcast: function upcast(element, data) {
+                    var embedWidgetUpcastFn = editor.config.embedWidgetUpcastFn || defaultEmbedWidgetUpcastFn;
+
+                    return embedWidgetUpcastFn(element, data);
+                }
+            });
+
+            // Add a listener to handle paste events and turn links into embed objects
+            editor.once('contentDom', function () {
+                editor.on('paste', function (event) {
+                    var link = event.data.dataValue;
+
+                    if (REGEX_HTTP.test(link)) {
+                        event.stop();
+
+                        editor.execCommand('embedUrl', {
+                            url: event.data.dataValue
+                        });
+                    }
+                });
+            });
+
+            // Add a listener to handle selection change events and properly detect editor
+            // interactions on the widgets without messing with widget native selection
+            editor.on('selectionChange', function (event) {
+                var selection = editor.getSelection();
+
+                if (selection) {
+                    var element = selection.getSelectedElement();
+
+                    if (element) {
+                        var widgetElement = element.findOne('[data-widget="ae_embed"]');
+
+                        if (widgetElement) {
+                            var region = element.getClientRect();
+
+                            var scrollPosition = new CKEDITOR.dom.window(window).getScrollPosition();
+                            region.left -= scrollPosition.x;
+                            region.top += scrollPosition.y;
+
+                            region.direction = CKEDITOR.SELECTION_BOTTOM_TO_TOP;
+
+                            editor.fire('editorInteraction', {
+                                nativeEvent: {},
+                                selectionData: {
+                                    element: widgetElement,
+                                    region: region
+                                }
+                            });
+                        }
+                    }
+                }
+            });
+
+            // Add a filter to skip filtering widget elements
+            editor.filter.addElementCallback(function (element) {
+                if ('data-ae-embed-url' in element.attributes) {
+                    return CKEDITOR.FILTER_SKIP_TREE;
+                }
+            });
+        }
+    });
+})();
+'use strict';
+
+(function () {
+    'use strict';
+
+    if (CKEDITOR.plugins.get('ae_imagealignment')) {
+        return;
+    }
+
+    /**
+     * Enum for supported image alignments
+     * @type {Object}
+     */
+    var IMAGE_ALIGNMENT = {
+        CENTER: 'center',
+        LEFT: 'left',
+        RIGHT: 'right'
+    };
+
+    /**
+     * Enum values for supported image alignments
+     * @type {Array}
+     */
+    var ALIGN_VALUES = [IMAGE_ALIGNMENT.LEFT, IMAGE_ALIGNMENT.RIGHT, IMAGE_ALIGNMENT.CENTER];
+
+    /**
+     * Necessary styles for the center alignment
+     * @type {Array.<Object>}
+     */
+    var CENTERED_IMAGE_STYLE = [{
+        name: 'display',
+        value: 'block'
+    }, {
+        name: 'margin-left',
+        value: '50%'
+    }, {
+        name: 'transform',
+        value: 'translateX(-50%)',
+        vendorPrefixes: ['-ms-']
+    }];
+
+    /**
+     * Retrieves the alignment value of an image.
+     *
+     * @param {CKEDITOR.dom.element} image The image element
+     * @return {String} The alignment value
+     */
+    var getImageAlignment = function getImageAlignment(image) {
+        var imageAlignment = image.getStyle('float');
+
+        if (!imageAlignment || imageAlignment === 'inherit' || imageAlignment === 'none') {
+            imageAlignment = image.getAttribute('align');
+        }
+
+        if (!imageAlignment) {
+            var centeredImage = CENTERED_IMAGE_STYLE.every(function (style) {
+                var styleCheck = image.getStyle(style.name) === style.value;
+
+                if (!styleCheck && style.vendorPrefixes) {
+                    styleCheck = style.vendorPrefixes.some(function (vendorPrefix) {
+                        return image.getStyle(vendorPrefix + style.name) === style.value;
+                    });
+                }
+
+                return styleCheck;
+            });
+
+            imageAlignment = centeredImage ? IMAGE_ALIGNMENT.CENTER : null;
+        }
+
+        return imageAlignment;
+    };
+
+    /**
+     * Removes the alignment value of an image
+     *
+     * @param {CKEDITOR.dom.element} image The image element
+     * @param {String} imageAlignment The image alignment value to be removed
+     */
+    var removeImageAlignment = function removeImageAlignment(image, imageAlignment) {
+        if (imageAlignment === IMAGE_ALIGNMENT.LEFT || imageAlignment === IMAGE_ALIGNMENT.RIGHT) {
+            image.removeStyle('float');
+
+            if (imageAlignment === getImageAlignment(image)) {
+                image.removeAttribute('align');
+            }
+        } else if (imageAlignment === IMAGE_ALIGNMENT.CENTER) {
+            CENTERED_IMAGE_STYLE.forEach(function (style) {
+                image.removeStyle(style.name);
+
+                if (style.vendorPrefixes) {
+                    style.vendorPrefixes.forEach(function (vendorPrefix) {
+                        image.removeStyle(vendorPrefix + style.name);
+                    });
+                }
+            });
+        }
+    };
+
+    /**
+     * Sets the alignment value of an image
+     *
+     * @param {CKEDITOR.dom.element} image The image element
+     * @param {String} imageAlignment The image alignment value to be set
+     */
+    var setImageAlignment = function setImageAlignment(image, imageAlignment) {
+        removeImageAlignment(image, getImageAlignment(image));
+
+        if (imageAlignment === IMAGE_ALIGNMENT.LEFT || imageAlignment === IMAGE_ALIGNMENT.RIGHT) {
+            image.setStyle('float', imageAlignment);
+        } else if (imageAlignment === IMAGE_ALIGNMENT.CENTER) {
+            CENTERED_IMAGE_STYLE.forEach(function (style) {
+                image.setStyle(style.name, style.value);
+
+                if (style.vendorPrefixes) {
+                    style.vendorPrefixes.forEach(function (vendorPrefix) {
+                        image.setStyle(vendorPrefix + style.name, style.value);
+                    });
+                }
+            });
+        }
+    };
+
+    /**
+     * CKEditor plugin which modifies the justify commands to properly align images. This
+     * plugin is an excerpt of CKEditor's original image one that can be found at
+     * https://github.com/ckeditor/ckeditor-dev/blob/master/plugins/image/plugin.js
+     *
+     * @class CKEDITOR.plugins.ae_imagealignment
+     */
+    CKEDITOR.plugins.add('ae_imagealignment', {
+        /**
+         * Initialization of the plugin, part of CKEditor plugin lifecycle.
+         * The function registers a 'paste' event on the editing area.
+         *
+         * @method afterInit
+         * @param {Object} editor The current editor instance
+         */
+        afterInit: function afterInit(editor) {
+            var self = this;
+
+            ALIGN_VALUES.forEach(function (value) {
+                var command = editor.getCommand('justify' + value);
+
+                if (command) {
+                    command.on('exec', function (event) {
+                        var selectionData = editor.getSelectionData();
+
+                        if (selectionData && AlloyEditor.SelectionTest.image({ data: { selectionData: selectionData } })) {
+                            var image = selectionData.element;
+
+                            var imageAlignment = getImageAlignment(image);
+
+                            if (imageAlignment === value) {
+                                removeImageAlignment(image, value);
+                            } else {
+                                setImageAlignment(image, value);
+                            }
+
+                            event.cancel();
+
+                            self.refreshCommands(editor, new CKEDITOR.dom.elementPath(image));
+                        }
+                    });
+
+                    command.on('refresh', function (event) {
+                        var selectionData = editor.getSelectionData();
+
+                        if (selectionData && AlloyEditor.SelectionTest.image({ data: { selectionData: selectionData } })) {
+                            var imageAlignment = getImageAlignment(selectionData.element);
+
+                            this.setState(imageAlignment === value ? CKEDITOR.TRISTATE_ON : CKEDITOR.TRISTATE_OFF);
+
+                            event.cancel();
+                        }
+                    });
+                }
+            });
+        },
+
+        /**
+         * Forces a refresh of the modified justify commands. This is needed because the applied changes
+         * do not modify the selection, so the refresh is never triggered and the UI does not update
+         * properly until the next selectionChange event.
+         *
+         * @param {CKEDITOR.editor} editor The editor instance
+         * @param {CKEDITOR.dom.elementPath} elementPath The path of the selected image
+         */
+        refreshCommands: function refreshCommands(editor, elementPath) {
+            ALIGN_VALUES.forEach(function (value) {
+                var command = editor.getCommand('justify' + value);
+
+                if (command) {
+                    command.refresh(editor, elementPath);
+                }
+            });
+        }
+    });
+})();
+'use strict';
+
+(function () {
+    'use strict';
+
+    if (CKEDITOR.plugins.get('ae_pasteimages')) {
         return;
     }
 
     /**
      * CKEditor plugin which allows pasting images directly into the editable area. The image will be encoded
-     * as Data URI. An event `imageAdd` will be fired with the inserted element into the editable area.
+     * as Data URI. An event `beforeImageAdd` will be fired with the list of pasted images. If any of the listeners
+     * returns `false` or cancels the event, the images won't be added to the content. Otherwise,
+     * an event `imageAdd` will be fired with the inserted element into the editable area.
      *
-     * @class CKEDITOR.plugins.pasteimages
+     * @class CKEDITOR.plugins.ae_pasteimages
+     */
+
+    /**
+     * Fired before adding images to the editor.
+     * @event beforeImageAdd
+     * @param {Array} imageFiles Array of image files
      */
 
     /**
@@ -1998,9 +3017,10 @@ CKEDITOR.disableAutoInline = true;
      *
      * @event imageAdd
      * @param {CKEDITOR.dom.element} el The created image with src as Data URI
+     * @param {File} file The image file
      */
 
-    CKEDITOR.plugins.add('pasteimages', {
+    CKEDITOR.plugins.add('ae_pasteimages', {
         /**
          * Initialization of the plugin, part of CKEditor plugin lifecycle.
          * The function registers a 'paste' event on the editing area.
@@ -2009,13 +3029,13 @@ CKEDITOR.disableAutoInline = true;
          * @param {Object} editor The current editor instance
          */
         init: function init(editor) {
-            editor.once('contentDom', (function () {
+            editor.once('contentDom', function () {
                 var editable = editor.editable();
 
                 editable.attachListener(editable, 'paste', this._onPaste, this, {
                     editor: editor
                 });
-            }).bind(this));
+            }.bind(this));
         },
 
         /**
@@ -2038,18 +3058,24 @@ CKEDITOR.disableAutoInline = true;
                     var reader = new FileReader();
                     var imageFile = pastedData.getAsFile();
 
-                    reader.onload = (function (event) {
-                        var el = CKEDITOR.dom.element.createFromHtml('<img src="' + event.target.result + '">');
+                    reader.onload = function (event) {
+                        var result = editor.fire('beforeImageAdd', {
+                            imageFiles: imageFile
+                        });
 
-                        editor.insertElement(el);
+                        if (!!result) {
+                            var el = CKEDITOR.dom.element.createFromHtml('<img src="' + event.target.result + '">');
 
-                        var imageData = {
-                            el: el,
-                            file: imageFile
-                        };
+                            editor.insertElement(el);
 
-                        editor.fire('imageAdd', imageData);
-                    }).bind(this);
+                            var imageData = {
+                                el: el,
+                                file: imageFile
+                            };
+
+                            editor.fire('imageAdd', imageData);
+                        }
+                    }.bind(this);
 
                     reader.readAsDataURL(imageFile);
                 }
@@ -2062,7 +3088,7 @@ CKEDITOR.disableAutoInline = true;
 (function () {
     'use strict';
 
-    if (CKEDITOR.plugins.get('placeholder')) {
+    if (CKEDITOR.plugins.get('ae_placeholder')) {
         return;
     }
 
@@ -2070,18 +3096,18 @@ CKEDITOR.disableAutoInline = true;
      * CKEditor plugin which allows adding a placeholder to the editor. In this case, if there
      * is no content to the editor, there will be hint to the user.
      *
-     * @class CKEDITOR.plugins.placeholder
+     * @class CKEDITOR.plugins.ae_placeholder
      */
 
     /**
      * Specifies the placeholder class which have to be aded to editor when editor is not focuced.
      *
      * @attribute placeholderClass
-     * @default ae-placeholder
+     * @default ae_placeholder
      * @type String
      */
 
-    CKEDITOR.plugins.add('placeholder', {
+    CKEDITOR.plugins.add('ae_placeholder', {
 
         /**
          * Initialization of the plugin, part of CKEditor plugin lifecycle.
@@ -2120,14 +3146,68 @@ CKEDITOR.disableAutoInline = true;
         }
     });
 })();
+'use strict';
+
+(function () {
+    'use strict';
+
+    if (CKEDITOR.plugins.get('ae_selectionkeystrokes')) {
+        return;
+    }
+
+    /**
+     * CKEditor plugin that simulates editor interaction events based on manual keystrokes. This
+     * can be used to trigger different reactions in the editor.
+     *
+     * @class CKEDITOR.plugins.ae_selectionkeystrokes
+     */
+    CKEDITOR.plugins.add('ae_selectionkeystrokes', {
+        requires: 'ae_selectionregion',
+
+        /**
+         * Initialization of the plugin, part of CKEditor plugin lifecycle.
+         * The function adds a command to the editor for every defined selectionKeystroke
+         * in the configuration and maps it to the specified keystroke.
+         *
+         * @method init
+         * @param {Object} editor The current editor instance
+         */
+        init: function init(editor) {
+            if (editor.config.selectionKeystrokes) {
+                editor.config.selectionKeystrokes.forEach(function (selectionKeystroke) {
+                    var command = new CKEDITOR.command(editor, {
+                        exec: function exec(editor) {
+                            editor.fire('editorInteraction', {
+                                manualSelection: selectionKeystroke.selection,
+                                nativeEvent: {},
+                                selectionData: editor.getSelectionData()
+                            });
+                        }
+                    });
+
+                    var commandName = 'selectionKeystroke' + selectionKeystroke.selection;
+
+                    editor.addCommand(commandName, command);
+                    editor.setKeystroke(selectionKeystroke.keys, commandName);
+                });
+            }
+        }
+    });
+})();
+'use strict';
+
 /**
  * @license Copyright (c) 2003-2015, CKSource - Frederico Knabben. All rights reserved.
  * For licensing, see LICENSE.md or http://ckeditor.com/license
  */
 
-'use strict';
-
 (function () {
+    'use strict';
+
+    if (CKEDITOR.plugins.get('ae_tableresize')) {
+        return;
+    }
+
     var pxUnit = CKEDITOR.tools.cssLength;
 
     function getWidth(el) {
@@ -2213,10 +3293,10 @@ CKEDITOR.disableAutoInline = true;
             }
             // Otherwise calculate positions based on the table (for last cell).
             else {
-                x = table.getDocumentPosition().x;
+                    x = table.getDocumentPosition().x;
 
-                rtl ? pillarLeft = x : pillarRight = x + table.$.offsetWidth;
-            }
+                    rtl ? pillarLeft = x : pillarRight = x + table.$.offsetWidth;
+                }
 
             pillarWidth = Math.max(pillarRight - pillarLeft, 4);
 
@@ -2462,8 +3542,8 @@ CKEDITOR.disableAutoInline = true;
         evt.removeListener();
     }
 
-    CKEDITOR.plugins.add('tableresize', {
-        requires: 'tabletools',
+    CKEDITOR.plugins.add('ae_tableresize', {
+        requires: 'ae_tabletools',
 
         init: function init(editor) {
             editor.on('contentDom', function () {
@@ -2524,15 +3604,19 @@ CKEDITOR.disableAutoInline = true;
         }
     });
 })();
+'use strict';
+
 /**
  * @license Copyright (c) 2003-2015, CKSource - Frederico Knabben. All rights reserved.
  * For licensing, see LICENSE.md or http://ckeditor.com/license
  */
 
-'use strict';
-
 (function () {
-	if (CKEDITOR.plugins.tabletools) return;
+	'use strict';
+
+	if (CKEDITOR.plugins.get('ae_tabletools')) {
+		return;
+	}
 
 	var cellNodeRegex = /^(?:td|th)$/;
 
@@ -2598,9 +3682,9 @@ CKEDITOR.disableAutoInline = true;
 		    focusedCell,
 		    tr;
 
-		while (cell = cellsToDelete[i++]) CKEDITOR.dom.element.setMarker(database, cell, 'delete_cell', true);
-
-		// 1.first we check left or right side focusable cell row by row;
+		while (cell = cellsToDelete[i++]) {
+			CKEDITOR.dom.element.setMarker(database, cell, 'delete_cell', true);
+		} // 1.first we check left or right side focusable cell row by row;
 		i = 0;
 		while (cell = cellsToDelete[i++]) {
 			if ((focusedCell = cell.getPrevious()) && !focusedCell.getCustomData('delete_cell') || (focusedCell = cell.getNext()) && !focusedCell.getCustomData('delete_cell')) {
@@ -2685,14 +3769,14 @@ CKEDITOR.disableAutoInline = true;
 					if (cell.$.rowSpan == 1) cell.remove();
 					// Row spanned cell.
 					else {
-						// Span row of the cell, reduce spanning.
-						cell.$.rowSpan -= 1;
-						// Root row of the cell, root cell to next row.
-						if (cellRowIndex == i) {
-							var nextMapRow = map[i + 1];
-							nextMapRow[j - 1] ? cell.insertAfter(new CKEDITOR.dom.element(nextMapRow[j - 1])) : new CKEDITOR.dom.element(table.$.rows[i + 1]).append(cell, 1);
+							// Span row of the cell, reduce spanning.
+							cell.$.rowSpan -= 1;
+							// Root row of the cell, root cell to next row.
+							if (cellRowIndex == i) {
+								var nextMapRow = map[i + 1];
+								nextMapRow[j - 1] ? cell.insertAfter(new CKEDITOR.dom.element(nextMapRow[j - 1])) : new CKEDITOR.dom.element(table.$.rows[i + 1]).append(cell, 1);
+							}
 						}
-					}
 
 					j += cell.$.colSpan - 1;
 				}
@@ -2708,9 +3792,9 @@ CKEDITOR.disableAutoInline = true;
 			// 3. Into table's parent element if it's the very last row.
 			var cursorPosition = new CKEDITOR.dom.element(rows[endRowIndex + 1] || (startRowIndex > 0 ? rows[startRowIndex - 1] : null) || table.$.parentNode);
 
-			for (i = rowsToDelete.length; i >= 0; i--) deleteRows(rowsToDelete[i]);
-
-			return cursorPosition;
+			for (i = rowsToDelete.length; i >= 0; i--) {
+				deleteRows(rowsToDelete[i]);
+			}return cursorPosition;
 		} else if (selectionOrRow instanceof CKEDITOR.dom.element) {
 			table = selectionOrRow.getAscendant('table');
 
@@ -2853,9 +3937,9 @@ CKEDITOR.disableAutoInline = true;
 			var table = cellsToDelete[0] && cellsToDelete[0].getAscendant('table');
 			var cellToFocus = getFocusElementAfterDelCells(cellsToDelete);
 
-			for (var i = cellsToDelete.length - 1; i >= 0; i--) deleteCells(cellsToDelete[i]);
-
-			if (cellToFocus) placeCursorInCell(cellToFocus, true);else if (table) table.remove();
+			for (var i = cellsToDelete.length - 1; i >= 0; i--) {
+				deleteCells(cellsToDelete[i]);
+			}if (cellToFocus) placeCursorInCell(cellToFocus, true);else if (table) table.remove();
 		} else if (selectionOrCell instanceof CKEDITOR.dom.element) {
 			var tr = selectionOrCell.getParent();
 			if (tr.getChildCount() == 1) tr.remove();else selectionOrCell.remove();
@@ -2955,7 +4039,7 @@ CKEDITOR.disableAutoInline = true;
 		    lastRowIndex = startRow,
 		    totalRowSpan = 0,
 		    totalColSpan = 0,
-		   
+
 		// Use a documentFragment as buffer when appending cell contents.
 		frag = !isDetect && new CKEDITOR.dom.documentFragment(doc),
 		    dimension = 0;
@@ -2978,7 +4062,7 @@ CKEDITOR.disableAutoInline = true;
 
 			if (!isDetect) {
 				// Trim all cell fillers and check to remove empty cells.
-				if ((trimCell(cell), cell.getChildren().count())) {
+				if (trimCell(cell), cell.getChildren().count()) {
 					// Merge vertically cells as two separated paragraphs.
 					if (rowIndex != lastRowIndex && cellFirstChild && !(cellFirstChild.isBlockBoundary && cellFirstChild.isBlockBoundary({ br: 1 }))) {
 						var last = frag.getLast(CKEDITOR.dom.walker.whitespaces(true));
@@ -3019,8 +4103,8 @@ CKEDITOR.disableAutoInline = true;
 		// Be able to merge cells only if actual dimension of selected
 		// cells equals to the caculated rectangle.
 		else {
-			return totalRowSpan * totalColSpan == dimension;
-		}
+				return totalRowSpan * totalColSpan == dimension;
+			}
 	}
 
 	function verticalSplitCell(selection, isDetect) {
@@ -3071,7 +4155,9 @@ CKEDITOR.disableAutoInline = true;
 			newCellTr.append(newCell = cell.clone());
 
 			var cellsInSameRow = cellInRow(map, rowIndex);
-			for (var i = 0; i < cellsInSameRow.length; i++) cellsInSameRow[i].rowSpan++;
+			for (var i = 0; i < cellsInSameRow.length; i++) {
+				cellsInSameRow[i].rowSpan++;
+			}
 		}
 
 		newCell.appendBogus();
@@ -3105,7 +4191,9 @@ CKEDITOR.disableAutoInline = true;
 		} else {
 			newCellColSpan = newColSpan = 1;
 			var cellsInSameCol = cellInCol(map, colIndex);
-			for (var i = 0; i < cellsInSameCol.length; i++) cellsInSameCol[i].colSpan++;
+			for (var i = 0; i < cellsInSameCol.length; i++) {
+				cellsInSameCol[i].colSpan++;
+			}
 		}
 		newCell = cell.clone();
 		newCell.insertAfter(cell);
@@ -3119,7 +4207,7 @@ CKEDITOR.disableAutoInline = true;
 		return newCell;
 	}
 
-	CKEDITOR.plugins.tabletools = {
+	CKEDITOR.plugins.add('ae_tabletools', {
 		init: function init(editor) {
 			var lang = editor.lang.table;
 
@@ -3132,15 +4220,15 @@ CKEDITOR.disableAutoInline = true;
 				});
 			}
 			function addCmd(name, def) {
-				var cmd = editor.addCommand(name, def);
+				var cmd = editor.getCommand(name);
+
+				if (cmd) {
+					return;
+				}
+
+				cmd = editor.addCommand(name, def);
 				editor.addFeature(cmd);
 			}
-
-			addCmd('cellProperties', new CKEDITOR.dialogCommand('cellProperties', createDef({
-				allowedContent: 'td th{width,height,border-color,background-color,white-space,vertical-align,text-align}[colspan,rowspan]',
-				requiredContent: 'table'
-			})));
-			CKEDITOR.dialog.add('cellProperties', this.path + 'dialogs/tableCell.js');
 
 			addCmd('rowDelete', createDef({
 				requiredContent: 'table',
@@ -3254,185 +4342,11 @@ CKEDITOR.disableAutoInline = true;
 					insertCell(selection);
 				}
 			}));
-
-			// If the "menu" plugin is loaded, register the menu items.
-			if (editor.addMenuItems) {
-				editor.addMenuItems({
-					tablecell: {
-						label: lang.cell.menu,
-						group: 'tablecell',
-						order: 1,
-						getItems: function getItems() {
-							var selection = editor.getSelection(),
-							    cells = getSelectedCells(selection);
-							return {
-								tablecell_insertBefore: CKEDITOR.TRISTATE_OFF,
-								tablecell_insertAfter: CKEDITOR.TRISTATE_OFF,
-								tablecell_delete: CKEDITOR.TRISTATE_OFF,
-								tablecell_merge: mergeCells(selection, null, true) ? CKEDITOR.TRISTATE_OFF : CKEDITOR.TRISTATE_DISABLED,
-								tablecell_merge_right: mergeCells(selection, 'right', true) ? CKEDITOR.TRISTATE_OFF : CKEDITOR.TRISTATE_DISABLED,
-								tablecell_merge_down: mergeCells(selection, 'down', true) ? CKEDITOR.TRISTATE_OFF : CKEDITOR.TRISTATE_DISABLED,
-								tablecell_split_vertical: verticalSplitCell(selection, true) ? CKEDITOR.TRISTATE_OFF : CKEDITOR.TRISTATE_DISABLED,
-								tablecell_split_horizontal: horizontalSplitCell(selection, true) ? CKEDITOR.TRISTATE_OFF : CKEDITOR.TRISTATE_DISABLED,
-								tablecell_properties: cells.length > 0 ? CKEDITOR.TRISTATE_OFF : CKEDITOR.TRISTATE_DISABLED
-							};
-						}
-					},
-
-					tablecell_insertBefore: {
-						label: lang.cell.insertBefore,
-						group: 'tablecell',
-						command: 'cellInsertBefore',
-						order: 5
-					},
-
-					tablecell_insertAfter: {
-						label: lang.cell.insertAfter,
-						group: 'tablecell',
-						command: 'cellInsertAfter',
-						order: 10
-					},
-
-					tablecell_delete: {
-						label: lang.cell.deleteCell,
-						group: 'tablecell',
-						command: 'cellDelete',
-						order: 15
-					},
-
-					tablecell_merge: {
-						label: lang.cell.merge,
-						group: 'tablecell',
-						command: 'cellMerge',
-						order: 16
-					},
-
-					tablecell_merge_right: {
-						label: lang.cell.mergeRight,
-						group: 'tablecell',
-						command: 'cellMergeRight',
-						order: 17
-					},
-
-					tablecell_merge_down: {
-						label: lang.cell.mergeDown,
-						group: 'tablecell',
-						command: 'cellMergeDown',
-						order: 18
-					},
-
-					tablecell_split_horizontal: {
-						label: lang.cell.splitHorizontal,
-						group: 'tablecell',
-						command: 'cellHorizontalSplit',
-						order: 19
-					},
-
-					tablecell_split_vertical: {
-						label: lang.cell.splitVertical,
-						group: 'tablecell',
-						command: 'cellVerticalSplit',
-						order: 20
-					},
-
-					tablecell_properties: {
-						label: lang.cell.title,
-						group: 'tablecellproperties',
-						command: 'cellProperties',
-						order: 21
-					},
-
-					tablerow: {
-						label: lang.row.menu,
-						group: 'tablerow',
-						order: 1,
-						getItems: function getItems() {
-							return {
-								tablerow_insertBefore: CKEDITOR.TRISTATE_OFF,
-								tablerow_insertAfter: CKEDITOR.TRISTATE_OFF,
-								tablerow_delete: CKEDITOR.TRISTATE_OFF
-							};
-						}
-					},
-
-					tablerow_insertBefore: {
-						label: lang.row.insertBefore,
-						group: 'tablerow',
-						command: 'rowInsertBefore',
-						order: 5
-					},
-
-					tablerow_insertAfter: {
-						label: lang.row.insertAfter,
-						group: 'tablerow',
-						command: 'rowInsertAfter',
-						order: 10
-					},
-
-					tablerow_delete: {
-						label: lang.row.deleteRow,
-						group: 'tablerow',
-						command: 'rowDelete',
-						order: 15
-					},
-
-					tablecolumn: {
-						label: lang.column.menu,
-						group: 'tablecolumn',
-						order: 1,
-						getItems: function getItems() {
-							return {
-								tablecolumn_insertBefore: CKEDITOR.TRISTATE_OFF,
-								tablecolumn_insertAfter: CKEDITOR.TRISTATE_OFF,
-								tablecolumn_delete: CKEDITOR.TRISTATE_OFF
-							};
-						}
-					},
-
-					tablecolumn_insertBefore: {
-						label: lang.column.insertBefore,
-						group: 'tablecolumn',
-						command: 'columnInsertBefore',
-						order: 5
-					},
-
-					tablecolumn_insertAfter: {
-						label: lang.column.insertAfter,
-						group: 'tablecolumn',
-						command: 'columnInsertAfter',
-						order: 10
-					},
-
-					tablecolumn_delete: {
-						label: lang.column.deleteColumn,
-						group: 'tablecolumn',
-						command: 'columnDelete',
-						order: 15
-					}
-				});
-			}
-
-			// If the "contextmenu" plugin is laoded, register the listeners.
-			if (editor.contextMenu) {
-				editor.contextMenu.addListener(function (element, selection, path) {
-					var cell = path.contains({ 'td': 1, 'th': 1 }, 1);
-					if (cell && !cell.isReadOnly()) {
-						return {
-							tablecell: CKEDITOR.TRISTATE_OFF,
-							tablerow: CKEDITOR.TRISTATE_OFF,
-							tablecolumn: CKEDITOR.TRISTATE_OFF
-						};
-					}
-
-					return null;
-				});
-			}
 		},
 
 		getSelectedCells: getSelectedCells
 
-	};
-	CKEDITOR.plugins.add('tabletools', CKEDITOR.plugins.tabletools);
+	});
 })();
 
 /**
@@ -3460,9 +4374,9 @@ CKEDITOR.tools.buildTableMap = function (table) {
 			var oCell = aRows[i].cells[j];
 
 			c++;
-			while (aMap[r][c]) c++;
-
-			var iColSpan = isNaN(oCell.colSpan) ? 1 : oCell.colSpan;
+			while (aMap[r][c]) {
+				c++;
+			}var iColSpan = isNaN(oCell.colSpan) ? 1 : oCell.colSpan;
 			var iRowSpan = isNaN(oCell.rowSpan) ? 1 : oCell.rowSpan;
 
 			for (var rs = 0; rs < iRowSpan; rs++) {
@@ -3483,184 +4397,614 @@ CKEDITOR.tools.buildTableMap = function (table) {
 (function () {
     'use strict';
 
-    /**
-     * AlloyEditor static object.
-     *
-     * @class AlloyEditor
-     * @type {Object}
-     */
-    window.AlloyEditor = {
-        /**
-         * Creates an instance of AlloyEditor.
-         *
-         * @method editable
-         * @static
-         * @param {String|Node} node The Node ID or HTMl node, which AlloyEditor should use as an editable area.
-         * @param {Object} config Configuration attributes for the current instance of AlloyEditor.
-         * @return {Object} An instance of {{#crossLink "Core"}}{{/crossLink}}
-         */
-        editable: function editable(node, config) {
-            config = config || {};
+    /* istanbul ignore if */
 
-            config.srcNode = node;
+    if (CKEDITOR.plugins.get('ae_buttonbridge')) {
+        return;
+    }
 
-            return new AlloyEditor.Core(config);
-        },
+    /* istanbul ignore next */
+    function noop() {}
 
-        /**
-         * The full URL for the AlloyEditor installation directory.
-         * It is possible to manually provide the base path by setting a
-         * global variable named `ALLOYEDITOR_BASEPATH`. This global variable
-         * must be set **before** the editor script loading.
-         *
-         * @method getBasePath
-         * @static
-         * @return {String} The found base path
-         */
-        getBasePath: function getBasePath() {
-            // Find out the editor directory path, based on its <script> tag.
-            var path = window.ALLOYEDITOR_BASEPATH || '';
-
-            if (!path) {
-                var scripts = document.getElementsByTagName('script');
-
-                for (var i = 0; i < scripts.length; i++) {
-                    var match = scripts[i].src.match(AlloyEditor.regexBasePath);
-
-                    if (match) {
-                        path = match[1];
-                        break;
-                    }
-                }
-            }
-
-            // In IE (only) the script.src string is the raw value entered in the
-            // HTML source. Other browsers return the full resolved URL instead.
-            if (path.indexOf(':/') === -1 && path.slice(0, 2) !== '//') {
-                // Absolute path.
-                if (path.indexOf('/') === 0) {
-                    path = location.href.match(/^.*?:\/\/[^\/]*/)[0] + path;
-                }
-                // Relative path.
-                else {
-                    path = location.href.match(/^[^\?]*\/(?:)/)[0] + path;
-                }
-            }
-
-            if (!path) {
-                throw 'The AlloyEditor installation path could not be automatically detected. Please set the global variable "ALLOYEDITOR_BASEPATH" before creating editor instances.';
-            }
-
-            return path;
-        },
-
-        /**
-         * Detects and load the corresponding language file if AlloyEditor language strings are not already present.
-         * The function fires a {{#crossLink "AlloyEditor/languageResourcesLoaded:event"}}{{/crossLink}} event
-         *
-         * @method loadLanguageResources
-         * @static
-         * @param {Function} callback Optional callback to be called when AlloyEditor loads the language resource.
-         */
-        loadLanguageResources: function loadLanguageResources(callback) {
-            if (AlloyEditor.Lang.isFunction(callback)) {
-                if (AlloyEditor.Strings) {
-                    setTimeout(callback, 0);
-                } else {
-                    AlloyEditor.once('languageResourcesLoaded', callback);
-                }
-            }
-
-            if (!AlloyEditor._langResourceRequested) {
-                AlloyEditor._langResourceRequested = true;
-
-                var languages = ['af', 'ar', 'bg', 'bn', 'bs', 'ca', 'cs', 'cy', 'da', 'de', 'el', 'en-au', 'en-ca', 'en-gb', 'en', 'eo', 'es', 'et', 'eu', 'fa', 'fi', 'fo', 'fr-ca', 'fr', 'gl', 'gu', 'he', 'hi', 'hr', 'hu', 'id', 'is', 'it', 'ja', 'ka', 'km', 'ko', 'ku', 'lt', 'lv', 'mk', 'mn', 'ms', 'nb', 'nl', 'no', 'pl', 'pt-br', 'pt', 'ro', 'ru', 'si', 'sk', 'sl', 'sq', 'sr-latn', 'sr', 'sv', 'th', 'tr', 'tt', 'ug', 'uk', 'vi', 'zh-cn', 'zh'];
-
-                var userLanguage = navigator.language || navigator.userLanguage || 'en';
-
-                var parts = userLanguage.toLowerCase().match(/([a-z]+)(?:-([a-z]+))?/);
-                var lang = parts[1];
-                var locale = parts[2];
-
-                if (languages[lang + '-' + locale]) {
-                    lang = lang + '-' + locale;
-                } else if (!languages.indexOf(lang)) {
-                    lang = 'en';
-                }
-
-                CKEDITOR.scriptLoader.load(AlloyEditor.getUrl('lang/alloy-editor/' + lang + '.js'), function (loaded) {
-                    if (loaded) {
-                        AlloyEditor.fire('languageResourcesLoaded');
-                    }
-                }, this);
-            }
-        },
-
-        /**
-         * Gets the full URL for AlloyEditor resources. By default, URLs
-         * returned by this function contain a querystring parameter ("t")
-         * set to the {@link CKEDITOR#timestamp} value.
-         *
-         * @method getUrl
-         * @static
-         * @param {String} resource The resource whose full URL we want to get.
-         * It may be a full, absolute, or relative URL.
-         * @return {String} The full URL.
-         */
-        getUrl: function getUrl(resource) {
-            var basePath = AlloyEditor.getBasePath();
-
-            // If this is not a full or absolute path.
-            if (resource.indexOf(':/') === -1 && resource.indexOf('/') !== 0) {
-                resource = basePath + resource;
-            }
-
-            // Add the timestamp, except for directories.
-            if (CKEDITOR.timestamp && resource.charAt(resource.length - 1) !== '/' && !/[&?]t=/.test(resource)) {
-                resource += (resource.indexOf('?') >= 0 ? '&' : '?') + 't=' + CKEDITOR.timestamp;
-            }
-
-            return resource;
-        },
-
-        /**
-         * Regular expression which should match the script which have been used to load AlloyEditor.
-         *
-         * @property
-         * @type {RegExp}
-         * @static
-         */
-        regexBasePath: /(^|.*[\\\/])(?:alloy-editor[^/]+|alloy-editor)\.js(?:\?.*|;.*)?$/i,
-
-        /**
-         * And object, containing all currently registered buttons in AlloyEditor.
-         *
-         * @property Buttons
-         * @type {Object}
-         * @static
-         */
-        Buttons: {},
-
-        /**
-         * And object, containing all currently registered toolbars in AlloyEditor.
-         *
-         * @property Toolbars
-         * @type {Object}
-         * @static
-         */
-        Toolbars: {}
-
-        /**
-         * Fired when AlloyEditor detects the browser language and loads the corresponding language file. Once this event
-         * is fired, AlloyEditor.Strings will be populated with data.
-         *
-         * @event languageResourcesLoaded
-         */
+    // API not yet implemented inside the button bridge. By mocking the unsupported methods, we
+    // prevent plugins from crashing if they make use of them.
+    //
+    // Some methods like `getState` and `setState` clash with React's own state methods. For them,
+    // unsupported means that we don't account for the different meaning in the passed or returned
+    // arguments.
+    var UNSUPPORTED_BUTTON_API = {
+        //getState: function() {},
+        //setState: function(state) {},
+        toFeature: noop
     };
 
-    CKEDITOR.event.implementOn(AlloyEditor);
+    var BUTTON_DEFS = {};
+
+    /**
+     * Generates a ButtonBridge React class for a given button definition if it has not been
+     * already created based on the button name and definition.
+     *
+     * @private
+     * @method generateButtonBridge
+     * @param {String} buttonName The button's name
+     * @param {Object} buttonDefinition The button's definition
+     * @return {Object} The generated or already existing React Button Class
+     */
+
+    function generateButtonBridge(buttonName, buttonDefinition, editor) {
+        var ButtonBridge = AlloyEditor.Buttons[buttonName];
+
+        BUTTON_DEFS[editor.name] = BUTTON_DEFS[editor.name] || {};
+        BUTTON_DEFS[editor.name][buttonName] = BUTTON_DEFS[editor.name][buttonName] || buttonDefinition;
+
+        if (!ButtonBridge) {
+            ButtonBridge = React.createClass(CKEDITOR.tools.merge(UNSUPPORTED_BUTTON_API, {
+                displayName: buttonName,
+
+                propTypes: {
+                    editor: React.PropTypes.object.isRequired,
+                    tabIndex: React.PropTypes.number
+                },
+
+                statics: {
+                    key: buttonName
+                },
+
+                render: function render() {
+                    var editor = this.props.editor.get('nativeEditor');
+
+                    var buttonClassName = 'ae-button ae-button-bridge';
+
+                    var buttonDisplayName = BUTTON_DEFS[editor.name][buttonName].name || BUTTON_DEFS[editor.name][buttonName].command || buttonName;
+
+                    var buttonLabel = BUTTON_DEFS[editor.name][buttonName].label;
+
+                    var buttonType = 'button-' + buttonDisplayName;
+
+                    var iconClassName = 'ae-icon-' + buttonDisplayName;
+
+                    var iconStyle = {};
+
+                    var cssStyle = CKEDITOR.skin.getIconStyle(buttonDisplayName);
+
+                    if (cssStyle) {
+                        var cssStyleParts = cssStyle.split(';');
+
+                        iconStyle.backgroundImage = cssStyleParts[0].substring(cssStyleParts[0].indexOf(':') + 1);
+                        iconStyle.backgroundPosition = cssStyleParts[1].substring(cssStyleParts[1].indexOf(':') + 1);
+                        iconStyle.backgroundSize = cssStyleParts[2].substring(cssStyleParts[2].indexOf(':') + 1);
+                    }
+
+                    return React.createElement(
+                        'button',
+                        { 'aria-label': buttonLabel, className: buttonClassName, 'data-type': buttonType, onClick: this._handleClick, tabIndex: this.props.tabIndex, title: buttonLabel },
+                        React.createElement('span', { className: iconClassName, style: iconStyle })
+                    );
+                },
+
+                _handleClick: function _handleClick(event) {
+                    var editor = this.props.editor.get('nativeEditor');
+
+                    var buttonCommand = BUTTON_DEFS[editor.name][buttonName].command;
+
+                    var buttonOnClick = BUTTON_DEFS[editor.name][buttonName].onClick;
+
+                    if (buttonOnClick) {
+                        buttonOnClick.call(this);
+                    } else {
+                        editor.execCommand(buttonCommand);
+                    }
+
+                    editor.fire('actionPerformed', this);
+                }
+            }));
+
+            AlloyEditor.Buttons[buttonName] = ButtonBridge;
+        }
+
+        return ButtonBridge;
+    }
+
+    /* istanbul ignore else */
+    if (!CKEDITOR.plugins.get('button')) {
+        CKEDITOR.UI_BUTTON = 'button';
+
+        CKEDITOR.plugins.add('button', {});
+    }
+
+    /**
+     * CKEditor plugin that bridges the support offered by CKEditor Button plugin. It takes over the
+     * responsibility of registering and creating buttons via:
+     * - editor.ui.addButton(name, definition)
+     * - editor.ui.add(name, CKEDITOR.UI_BUTTON, definition)
+     *
+     * @class CKEDITOR.plugins.ae_buttonbridge
+     * @requires CKEDITOR.plugins.ae_uibridge
+     * @constructor
+     */
+    CKEDITOR.plugins.add('ae_buttonbridge', {
+        requires: ['ae_uibridge'],
+
+        /**
+         * Set the add handler for UI_BUTTON to our own. We do this in the init phase to override
+         * the one in the native plugin in case it's present.
+         *
+         * @method init
+         * @param {Object} editor The CKEditor instance being initialized
+         */
+        init: function init(editor) {
+            editor.ui.addButton = function (buttonName, buttonDefinition) {
+                this.add(buttonName, CKEDITOR.UI_BUTTON, buttonDefinition);
+            };
+
+            editor.ui.addHandler(CKEDITOR.UI_BUTTON, {
+                add: generateButtonBridge,
+                create: function create(buttonDefinition) {
+                    var buttonName = 'buttonBridge' + (Math.random() * 1e9 >>> 0);
+                    var ButtonBridge = generateButtonBridge(buttonName, buttonDefinition);
+
+                    return new ButtonBridge();
+                }
+            });
+        }
+    });
 })();
 'use strict';
+
+(function () {
+    'use strict';
+
+    /* istanbul ignore if */
+
+    if (CKEDITOR.plugins.get('ae_panelmenubuttonbridge')) {
+        return;
+    }
+
+    /* istanbul ignore next */
+    function noop() {}
+
+    // API not yet implemented inside the panel menu button bridge. By mocking the unsupported methods, we
+    // prevent plugins from crashing if they make use of them.
+    var UNSUPPORTED_PANEL_MENU_BUTTON_API = {
+        createPanel: noop
+    };
+
+    var PANEL_MENU_DEFS = {};
+
+    /**
+     * Generates a PanelMenuButtonBridge React class for a given panelmenubutton definition if it has not been
+     * already created based on the panelmenubutton name and definition.
+     *
+     * @private
+     * @method generatePanelMenuButtonBridge
+     * @param {String} panelMenuButtonName The panel button name
+     * @param {Object} panelMenuButtonDefinition The panel button definition
+     * @return {Object} The generated or already existing React PanelMenuButton Class
+     */
+    var generatePanelMenuButtonBridge = function generatePanelMenuButtonBridge(panelMenuButtonName, panelMenuButtonDefinition, editor) {
+        var PanelMenuButtonBridge = AlloyEditor.Buttons[panelMenuButtonName];
+
+        PANEL_MENU_DEFS[editor.name] = PANEL_MENU_DEFS[editor.name] || {};
+        PANEL_MENU_DEFS[editor.name][panelMenuButtonName] = PANEL_MENU_DEFS[editor.name][panelMenuButtonName] || panelMenuButtonDefinition;
+
+        if (!PanelMenuButtonBridge) {
+            PanelMenuButtonBridge = React.createClass(CKEDITOR.tools.merge(UNSUPPORTED_PANEL_MENU_BUTTON_API, {
+                displayName: panelMenuButtonName,
+
+                propTypes: {
+                    editor: React.PropTypes.object.isRequired
+                },
+
+                statics: {
+                    key: panelMenuButtonName
+                },
+
+                render: function render() {
+                    var editor = this.props.editor.get('nativeEditor');
+
+                    var panelMenuButtonDisplayName = PANEL_MENU_DEFS[editor.name][panelMenuButtonName].name || PANEL_MENU_DEFS[editor.name][panelMenuButtonName].command || panelMenuButtonName;
+
+                    var buttonClassName = 'ae-button ae-button-bridge';
+
+                    var iconClassName = 'ae-icon-' + panelMenuButtonDisplayName;
+
+                    var iconStyle = {};
+
+                    var cssStyle = CKEDITOR.skin.getIconStyle(panelMenuButtonDisplayName);
+
+                    if (cssStyle) {
+                        var cssStyleParts = cssStyle.split(';');
+
+                        iconStyle.backgroundImage = cssStyleParts[0].substring(cssStyleParts[0].indexOf(':') + 1);
+                        iconStyle.backgroundPosition = cssStyleParts[1].substring(cssStyleParts[1].indexOf(':') + 1);
+                        iconStyle.backgroundSize = cssStyleParts[2].substring(cssStyleParts[2].indexOf(':') + 1);
+                    }
+
+                    var panel;
+
+                    if (this.props.expanded) {
+                        panel = this._getPanel();
+                    }
+
+                    return React.createElement(
+                        'div',
+                        { className: 'ae-container ae-has-dropdown' },
+                        React.createElement(
+                            'button',
+                            { 'aria-expanded': this.props.expanded, 'aria-label': PANEL_MENU_DEFS[editor.name][panelMenuButtonName].label, className: buttonClassName, onClick: this.props.toggleDropdown, role: 'combobox', tabIndex: this.props.tabIndex, title: PANEL_MENU_DEFS[editor.name][panelMenuButtonName].label },
+                            React.createElement('span', { className: iconClassName, style: iconStyle })
+                        ),
+                        panel
+                    );
+                },
+
+                _getPanel: function _getPanel() {
+                    var editor = this.props.editor.get('nativeEditor');
+
+                    var panelMenuButtonOnBlock = PANEL_MENU_DEFS[editor.name][panelMenuButtonName].onBlock;
+
+                    var panel = {
+                        hide: this.props.toggleDropdown,
+                        show: this.props.toggleDropdown
+                    };
+
+                    var blockElement = new CKEDITOR.dom.element('div');
+
+                    var block = {
+                        element: blockElement,
+                        keys: {}
+                    };
+
+                    /* istanbul ignore else */
+                    if (panelMenuButtonOnBlock) {
+                        panelMenuButtonOnBlock.call(this, panel, block);
+                    }
+
+                    // TODO
+                    // Use block.keys to configure the panel keyboard navigation
+
+                    return React.createElement(
+                        AlloyEditor.ButtonDropdown,
+                        { onDismiss: this.props.toggleDropdown },
+                        React.createElement('div', { className: blockElement.getAttribute('class'), dangerouslySetInnerHTML: { __html: blockElement.getHtml() } })
+                    );
+                }
+            }));
+
+            AlloyEditor.Buttons[panelMenuButtonName] = PanelMenuButtonBridge;
+        }
+
+        return PanelMenuButtonBridge;
+    };
+
+    /* istanbul ignore else */
+    if (!CKEDITOR.plugins.get('panelmenubutton')) {
+        CKEDITOR.UI_PANELBUTTON = 'panelmenubutton';
+
+        CKEDITOR.plugins.add('panelmenubutton', {});
+    }
+
+    /**
+     * CKEditor plugin that bridges the support offered by CKEditor PanelButton plugin. It takes over the
+     * responsibility of registering and creating buttons via:
+     * - editor.ui.addPanelMenuButton(name, definition)
+     * - editor.ui.add(name, CKEDITOR.UI_PANELBUTTON, definition)
+     *
+     * @class CKEDITOR.plugins.ae_panelmenubuttonbridge
+     * @requires CKEDITOR.plugins.ae_uibridge
+     * @constructor
+     */
+    CKEDITOR.plugins.add('ae_panelmenubuttonbridge', {
+        requires: ['ae_uibridge'],
+
+        /**
+         * Set the add handler for UI_PANELBUTTON to our own. We do this in the init phase to override
+         * the one in the native plugin in case it's present
+         *
+         * @method init
+         * @param {Object} editor The CKEditor instance being initialized
+         */
+        init: function init(editor) {
+            editor.ui.addPanelMenuButton = function (panelMenuButtonName, panelMenuButtonDefinition) {
+                this.add(panelMenuButtonName, CKEDITOR.UI_PANELBUTTON, panelMenuButtonDefinition);
+            };
+
+            editor.ui.addHandler(CKEDITOR.UI_PANELBUTTON, {
+                add: generatePanelMenuButtonBridge,
+                create: function create(panelMenuButtonDefinition) {
+                    var panelMenuButtonName = 'panelMenuButtonBridge' + (Math.random() * 1e9 >>> 0);
+                    var PanelMenuButtonBridge = generatePanelMenuButtonBridge(panelMenuButtonName, panelMenuButtonDefinition);
+
+                    return new PanelMenuButtonBridge();
+                }
+            });
+        }
+    });
+})();
+'use strict';
+
+(function () {
+    'use strict';
+
+    /* istanbul ignore if */
+
+    if (CKEDITOR.plugins.get('ae_richcombobridge')) {
+        return;
+    }
+
+    /* istanbul ignore next */
+    function noop() {}
+
+    // API not yet implemented inside the richcombo bridge. By mocking the unsupported methods, we
+    // prevent plugins from crashing if they make use of them.
+    //
+    // Some methods like `setState` clash with React's own state methods. For them, unsupported means
+    // that we don't account for the different meaning in the passed or returned arguments.
+    var UNSUPPORTED_RICHCOMBO_API = {
+        commit: noop,
+        createPanel: noop,
+        disable: noop,
+        enable: noop,
+        getState: noop,
+        hideGroup: noop,
+        hideItem: noop,
+        mark: noop,
+        //setState: noop,
+        showAll: noop,
+        startGroup: noop,
+        unmarkAll: noop
+    };
+
+    var RICH_COMBO_DEFS = {};
+
+    /**
+     * Generates a RichComboBridge React class for a given richcombo definition if it has not been
+     * already created based on the richcombo name and definition.
+     *
+     * @method generateRichComboBridge
+     * @private
+     * @param {String} richComboName The rich combo name
+     * @param {Object} richComboDefinition The rich combo definition
+     * @return {Object} The generated or already existing React RichCombo Class
+     */
+    var generateRichComboBridge = function generateRichComboBridge(richComboName, richComboDefinition, editor) {
+        var RichComboBridge = AlloyEditor.Buttons[richComboName];
+
+        RICH_COMBO_DEFS[editor.name] = RICH_COMBO_DEFS[editor.name] || {};
+        RICH_COMBO_DEFS[editor.name][richComboName] = RICH_COMBO_DEFS[editor.name][richComboName] || richComboDefinition;
+        RICH_COMBO_DEFS[editor.name][richComboName].currentValue = undefined;
+
+        if (!RichComboBridge) {
+            RichComboBridge = React.createClass(CKEDITOR.tools.merge(UNSUPPORTED_RICHCOMBO_API, {
+                displayName: richComboName,
+
+                propTypes: {
+                    editor: React.PropTypes.object.isRequired
+                },
+
+                statics: {
+                    key: richComboName
+                },
+
+                add: function add(value, preview, title) {
+                    this._items.push({
+                        preview: preview,
+                        title: title,
+                        value: value
+                    });
+                },
+
+                componentWillMount: function componentWillMount() {
+                    var editor = this.props.editor.get('nativeEditor');
+
+                    var editorCombo = RICH_COMBO_DEFS[editor.name][richComboName];
+
+                    this._items = [];
+
+                    this.setValue = this._setValue;
+
+                    if (editorCombo.init) {
+                        editorCombo.init.call(this);
+                    }
+
+                    if (editorCombo.onRender) {
+                        editorCombo.onRender.call(this);
+                    }
+                },
+
+                componentWillUnmount: function componentWillUnmount() {
+                    this._cacheValue(this.state.value);
+
+                    this.setValue = this._cacheValue;
+                },
+
+                getInitialState: function getInitialState() {
+                    return {
+                        value: RICH_COMBO_DEFS[editor.name][richComboName].currentValue
+                    };
+                },
+
+                getValue: function getValue() {
+                    return this.state.value;
+                },
+
+                render: function render() {
+                    var editor = this.props.editor.get('nativeEditor');
+
+                    var richComboLabel = RICH_COMBO_DEFS[editor.name][richComboName].currentValue || richComboDefinition.label;
+
+                    var itemsList;
+
+                    if (this.props.expanded) {
+                        itemsList = this._getItemsList();
+                    }
+
+                    return React.createElement(
+                        'div',
+                        { className: 'ae-container-dropdown ae-has-dropdown' },
+                        React.createElement(
+                            'button',
+                            { 'aria-expanded': this.props.expanded, 'aria-label': richComboLabel, className: 'ae-toolbar-element', onClick: this.props.toggleDropdown, role: 'combobox', tabIndex: this.props.tabIndex, title: richComboLabel },
+                            React.createElement(
+                                'div',
+                                { className: 'ae-container' },
+                                React.createElement(
+                                    'span',
+                                    { className: 'ae-container-dropdown-selected-item' },
+                                    richComboLabel
+                                ),
+                                React.createElement('span', { className: 'ae-icon-arrow' })
+                            )
+                        ),
+                        itemsList
+                    );
+                },
+
+                _cacheValue: function _cacheValue(value) {
+                    var editor = this.props.editor.get('nativeEditor');
+
+                    RICH_COMBO_DEFS[editor.name][richComboName].currentValue = value;
+                },
+
+                _getItems: function _getItems() {
+                    var richCombo = this;
+
+                    var items = this._items.map(function (item) {
+                        return React.createElement(
+                            'li',
+                            { key: item.title, role: 'option' },
+                            React.createElement('button', { className: 'ae-toolbar-element', dangerouslySetInnerHTML: { __html: item.preview }, 'data-value': item.value, onClick: richCombo._onClick })
+                        );
+                    });
+
+                    return items;
+                },
+
+                _getItemsList: function _getItemsList() {
+                    return React.createElement(
+                        AlloyEditor.ButtonDropdown,
+                        { onDismiss: this.props.toggleDropdown },
+                        this._getItems()
+                    );
+                },
+
+                _onClick: function _onClick(event) {
+                    var editor = this.props.editor.get('nativeEditor');
+
+                    var editorCombo = RICH_COMBO_DEFS[editor.name][richComboName];
+
+                    if (editorCombo.onClick) {
+                        var newValue = event.currentTarget.getAttribute('data-value');
+
+                        editorCombo.onClick.call(this, newValue);
+
+                        RICH_COMBO_DEFS[editor.name][richComboName].currentValue = newValue;
+
+                        editor.fire('actionPerformed', this);
+                    }
+                },
+
+                _setValue: function _setValue(value) {
+                    this.setState({
+                        value: value
+                    });
+                }
+            }));
+
+            AlloyEditor.Buttons[richComboName] = RichComboBridge;
+        }
+
+        return RichComboBridge;
+    };
+
+    /* istanbul ignore else */
+    if (!CKEDITOR.plugins.get('richcombo')) {
+        CKEDITOR.UI_RICHCOMBO = 'richcombo';
+
+        CKEDITOR.plugins.add('richcombo', {});
+    }
+
+    /**
+     * CKEditor plugin that bridges the support offered by CKEditor RichCombo plugin. It takes over the
+     * responsibility of registering and creating rich combo elements via:
+     * - editor.ui.addRichCombo(name, definition)
+     * - editor.ui.add(name, CKEDITOR.UI_RICHCOMBO, definition)
+     *
+     * @class CKEDITOR.plugins.ae_richcombobridge
+     * @requires CKEDITOR.plugins.ae_uibridge
+     * @constructor
+     */
+    CKEDITOR.plugins.add('ae_richcombobridge', {
+        requires: ['ae_uibridge'],
+
+        /**
+         * Set the add handler for UI_RICHCOMBO to our own. We do this in the init phase to override
+         * the one in the original plugin in case it's present
+         *
+         * @method init
+         * @param {Object} editor The CKEditor instance being initialized
+         */
+        init: function init(editor) {
+            editor.ui.addRichCombo = function (richComboName, richComboDefinition) {
+                this.add(richComboName, CKEDITOR.UI_RICHCOMBO, richComboDefinition);
+            };
+
+            editor.ui.addHandler(CKEDITOR.UI_RICHCOMBO, {
+                add: generateRichComboBridge,
+                create: function create(richComboDefinition) {
+                    var richComboName = 'richComboBridge' + (Math.random() * 1e9 >>> 0);
+                    var RichComboBridge = generateRichComboBridge(richComboName, richComboDefinition);
+
+                    return new RichComboBridge();
+                }
+            });
+        }
+    });
+})();
+'use strict';
+
+(function () {
+    'use strict';
+
+    /* istanbul ignore if */
+
+    if (CKEDITOR.plugins.get('ae_uibridge')) {
+        return;
+    }
+
+    /**
+     * CKEditor plugin that extends CKEDITOR.ui.add function so an add handler can be specified
+     * on top of the original ones. It bridges the calls to add components via:
+     * - editor.ui.add(name, type, definition)
+     *
+     * @class CKEDITOR.plugins.ae_uibridge
+     * @constructor
+     */
+    CKEDITOR.plugins.add('ae_uibridge', {
+        /**
+         * Initialization of the plugin, part of CKEditor plugin lifecycle.
+         *
+         * @method beforeInit
+         * @param {Object} editor The current editor instance
+         */
+        beforeInit: function beforeInit(editor) {
+            var originalUIAddFn = editor.ui.add;
+
+            editor.ui.add = function (name, type, definition) {
+                originalUIAddFn.apply(this, arguments);
+
+                var typeHandler = this._.handlers[type];
+
+                if (typeHandler && typeHandler.add) {
+                    typeHandler.add(name, definition, editor);
+                }
+            };
+        }
+    });
+})();
+'use strict';
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol ? "symbol" : typeof obj; };
 
 (function () {
     'use strict';
@@ -3670,6 +5014,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class Lang
      */
+
     var Lang = {
         /**
          * Check if the passed value is an array.
@@ -3740,7 +5085,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @return {Boolean} True if the passed value is an object, false otherwise.
          */
         isObject: function isObject(value) {
-            var valueType = typeof value;
+            var valueType = typeof value === 'undefined' ? 'undefined' : _typeof(value);
 
             return value && (valueType === 'object' || Lang.isFunction(value));
         },
@@ -3854,6 +5199,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      * @class Attribute
      * @constructor
     */
+
     function Attribute(config) {
         this.__config__ = config || {};
         this.__ATTRS__ = {};
@@ -3979,26 +5325,26 @@ CKEDITOR.tools.buildTableMap = function (table) {
             // else if the attribute has readOnly flag, set the default value from the attribute,
             // regardless if there is value or not
             else if (currentAttr.readOnly) {
-                value = currentAttr.value;
-            }
-            // else if the attribute has writeOnce value, set it from the passed configuration or from the
-            // default value, in this order. Otherwise, return miserable.
-            else if (currentAttr.writeOnce) {
-                if (hasPassedValueViaConfig) {
-                    value = this.__config__[attr];
-                } else if (hasDefaultValue) {
                     value = currentAttr.value;
-                } else {
-                    return;
                 }
-            }
-            // These two cases below are easy - set the value to be from the passed config or
-            // from the default value, in this order.
-            else if (hasPassedValueViaConfig) {
-                value = this.__config__[attr];
-            } else if (hasDefaultValue) {
-                value = currentAttr.value;
-            }
+                // else if the attribute has writeOnce value, set it from the passed configuration or from the
+                // default value, in this order. Otherwise, return miserable.
+                else if (currentAttr.writeOnce) {
+                        if (hasPassedValueViaConfig) {
+                            value = this.__config__[attr];
+                        } else if (hasDefaultValue) {
+                            value = currentAttr.value;
+                        } else {
+                            return;
+                        }
+                    }
+                    // These two cases below are easy - set the value to be from the passed config or
+                    // from the default value, in this order.
+                    else if (hasPassedValueViaConfig) {
+                            value = this.__config__[attr];
+                        } else if (hasDefaultValue) {
+                            value = currentAttr.value;
+                        }
 
             // If there is validator, and user passed config object - check the returned value.
             // If it is false, then set as initial value the default one.
@@ -4049,6 +5395,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      * @class Base
      * @constructor
      */
+
     function Base(config) {
         Base.superclass.constructor.call(this, config);
 
@@ -4129,24 +5476,67 @@ CKEDITOR.tools.buildTableMap = function (table) {
 (function () {
     'use strict';
 
+    // Default gutter value for toolbar positioning
+
+    var DEFAULT_GUTTER = {
+        left: 0,
+        top: 0
+    };
+
+    /**
+     * Centers a Toolbar according to given rectangle
+     *
+     * @method centerToolbar
+     * @param {Object} toolbar The toolbar to be centered
+     * @param {Object} rect The rectangle according to which the Toolbar will be centered
+     */
+    var centerToolbar = function centerToolbar(toolbar, rect) {
+        var toolbarNode = ReactDOM.findDOMNode(toolbar);
+
+        var halfNodeWidth = toolbarNode.offsetWidth / 2;
+        var scrollPosition = new CKEDITOR.dom.window(window).getScrollPosition();
+
+        var gutter = toolbar.props.gutter || DEFAULT_GUTTER;
+
+        var widgetXY = toolbar.getWidgetXYPoint(rect.left + rect.width / 2 - scrollPosition.x, rect.top + scrollPosition.y, CKEDITOR.SELECTION_BOTTOM_TO_TOP);
+
+        toolbar.moveToPoint([widgetXY[0], widgetXY[1]], [rect.left + rect.width / 2 - halfNodeWidth - scrollPosition.x, rect.top - toolbarNode.offsetHeight + scrollPosition.y - gutter.top]);
+    };
+
+    /**
+     * Sets the position of a toolbar according to the position of the selected image
+     *
+     * @method imageSelectionSetPosition
+     * @param {Object} payload Payload, should contain the selection data for retrieving the
+     * client rectangle of the selected image
+     * @return {Boolean} True, in all cases
+     */
+    var imageSelectionSetPosition = function imageSelectionSetPosition(payload) {
+        centerToolbar(this, payload.selectionData.element.getClientRect());
+
+        return true;
+    };
+
+    /**
+     * Sets the position of a toolbar according to the position of the selected image
+     *
+     * @method tableSelectionSetPosition
+     * @param {Object} payload Object, which contains the selection data for retrieving the
+     * client rectangle of the selected table
+     * @return {Boolean} True, in all cases
+     */
     var tableSelectionSetPosition = function tableSelectionSetPosition(payload) {
         var nativeEditor = payload.editor.get('nativeEditor');
 
         var table = new CKEDITOR.Table(nativeEditor).getFromSelection();
-        var clientRect = table.getClientRect();
 
-        var toolbarNode = this.getDOMNode();
-        var halfToolbarWidth = toolbarNode.offsetWidth / 2;
-        var scrollPos = new CKEDITOR.dom.window(window).getScrollPosition();
-
-        var widgetXY = this.getWidgetXYPoint(clientRect.left + clientRect.width / 2 - scrollPos.x, clientRect.top + scrollPos.y, CKEDITOR.SELECTION_BOTTOM_TO_TOP);
-
-        this.moveToPoint([widgetXY[0], widgetXY[1]], [clientRect.left + clientRect.width / 2 - halfToolbarWidth - scrollPos.x, clientRect.top - toolbarNode.offsetHeight + scrollPos.y]);
+        centerToolbar(this, table.getClientRect());
 
         return true;
     };
 
     AlloyEditor.SelectionSetPosition = {
+        image: imageSelectionSetPosition,
         table: tableSelectionSetPosition
     };
 })();
@@ -4155,16 +5545,36 @@ CKEDITOR.tools.buildTableMap = function (table) {
 (function () {
     'use strict';
 
+    var _isRangeAtElementEnd = function _isRangeAtElementEnd(range, element) {
+        // Finding if a range is at the end of an element is somewhat tricky due to how CKEditor handles
+        // ranges. It might depend on wether a source node inside the element is selected or not. For now,
+        // we need to cover the following cases:
+        //
+        // - The text length of the element is the same as the endOffset of the range
+        // - Both start and end containers match the element and the start and end offsets are 1
+
+        return element.getText().length === range.endOffset || element.equals(range.startContainer) && element.equals(range.endContainer) && range.startOffset === range.endOffset && range.endOffset === 1;
+    };
+
+    var embedSelectionTest = function embedSelectionTest(payload) {
+        var selectionData = payload.data.selectionData;
+
+        return !!(selectionData.element && selectionData.element.getAttribute('data-widget') === 'ae_embed');
+    };
+
     var linkSelectionTest = function linkSelectionTest(payload) {
         var nativeEditor = payload.editor.get('nativeEditor');
+        var range = nativeEditor.getSelection().getRanges()[0];
 
-        return !nativeEditor.isSelectionEmpty() && new CKEDITOR.Link(nativeEditor).getFromSelection();
+        var element;
+
+        return !!(nativeEditor.isSelectionEmpty() && (element = new CKEDITOR.Link(nativeEditor).getFromSelection()) && element.getText().length !== range.endOffset && !element.isReadOnly() && !_isRangeAtElementEnd(range, element));
     };
 
     var imageSelectionTest = function imageSelectionTest(payload) {
         var selectionData = payload.data.selectionData;
 
-        return selectionData.element && selectionData.element.getName() === 'img';
+        return !!(selectionData.element && selectionData.element.getName() === 'img' && !selectionData.element.isReadOnly());
     };
 
     var textSelectionTest = function textSelectionTest(payload) {
@@ -4174,16 +5584,20 @@ CKEDITOR.tools.buildTableMap = function (table) {
 
         var selectionData = payload.data.selectionData;
 
-        return !selectionData.element && selectionData.region && !selectionEmpty;
+        return !!(!selectionData.element && selectionData.region && !selectionEmpty && !nativeEditor.getSelection().getCommonAncestor().isReadOnly());
     };
 
     var tableSelectionTest = function tableSelectionTest(payload) {
         var nativeEditor = payload.editor.get('nativeEditor');
 
-        return !!new CKEDITOR.Table(nativeEditor).getFromSelection();
+        var table = new CKEDITOR.Table(nativeEditor);
+        var element = table.getFromSelection();
+
+        return !!(element && table.isEditable(element));
     };
 
     AlloyEditor.SelectionTest = {
+        embed: embedSelectionTest,
         image: imageSelectionTest,
         link: linkSelectionTest,
         table: tableSelectionTest,
@@ -4196,12 +5610,17 @@ CKEDITOR.tools.buildTableMap = function (table) {
     'use strict';
 
     var Selections = [{
+        name: 'embed',
+        buttons: ['embedRemove', 'embedEdit'],
+        test: AlloyEditor.SelectionTest.embed
+    }, {
         name: 'link',
         buttons: ['linkEdit'],
         test: AlloyEditor.SelectionTest.link
     }, {
         name: 'image',
-        buttons: ['imageLeft', 'imageRight'],
+        buttons: ['imageLeft', 'imageCenter', 'imageRight'],
+        setPosition: AlloyEditor.SelectionSetPosition.image,
         test: AlloyEditor.SelectionTest.image
     }, {
         name: 'text',
@@ -4229,6 +5648,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      * @class Core
      * @constructor
      */
+
     function Core(config) {
         Core.superclass.constructor.call(this, config);
     }
@@ -4243,6 +5663,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @param config {Object} Configuration object literal for the editor.
          */
         initializer: function initializer(config) {
+
             var node = this.get('srcNode');
 
             if (this.get('enableContentEditable')) {
@@ -4262,11 +5683,21 @@ CKEDITOR.tools.buildTableMap = function (table) {
             editor.config.pasteFromWordRemoveStyles = false;
             editor.config.pasteFromWordRemoveFontStyles = false;
 
+            editor.config.selectionKeystrokes = this.get('selectionKeystrokes');
+
             AlloyEditor.Lang.mix(editor.config, config);
 
             editor.once('contentDom', function () {
-                editor.editable().addClass('ae-editable');
-            });
+                if (editor.config.readOnly) {
+                    this._addReadOnlyLinkClickListener(editor);
+                }
+
+                var editable = editor.editable();
+
+                editable.addClass('ae-editable');
+
+                editable.editor.on('readOnly', this._onReadOnlyChangeFn.bind(this));
+            }.bind(this));
 
             AlloyEditor.loadLanguageResources(this._renderUI.bind(this));
 
@@ -4281,8 +5712,10 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @method destructor
          */
         destructor: function destructor() {
+            this._destroyed = true;
+
             if (this._editorUIElement) {
-                React.unmountComponentAtNode(this._editorUIElement);
+                ReactDOM.unmountComponentAtNode(this._editorUIElement);
                 this._editorUIElement.parentNode.removeChild(this._editorUIElement);
             }
 
@@ -4290,11 +5723,72 @@ CKEDITOR.tools.buildTableMap = function (table) {
 
             if (nativeEditor) {
                 var editable = nativeEditor.editable();
+
                 if (editable) {
                     editable.removeClass('ae-editable');
+
+                    if (this.get('enableContentEditable')) {
+                        this.get('srcNode').setAttribute('contenteditable', 'false');
+                    }
                 }
 
+                this._clearSelections();
+
                 nativeEditor.destroy();
+            }
+        },
+
+        /**
+         * Clear selections from window object
+         *
+         * @protected
+         * @method _clearSelections
+         */
+        _clearSelections: function _clearSelections() {
+            var nativeEditor = this.get('nativeEditor');
+            var isMSSelection = typeof window.getSelection != 'function';
+
+            if (isMSSelection) {
+                nativeEditor.document.$.selection.empty();
+            } else {
+                nativeEditor.document.getWindow().$.getSelection().removeAllRanges();
+            }
+        },
+
+        /**
+         * Method to set default link behavior
+         *
+         * @protected
+         * @method _addReadOnlyLinkClickListener
+         * @param {Object} editor
+         */
+        _addReadOnlyLinkClickListener: function _addReadOnlyLinkClickListener(editor) {
+            editor.editable().on('click', this._defaultReadOnlyClickFn, this, {
+                editor: editor
+            });
+        },
+
+        /**
+         * Called on `click` event when the editor is in read only mode. Navigates to link's URL or opens
+         * the link in a new window.
+         *
+         * @event readOnlyClick
+         * @protected
+         * @method _defaultReadOnlyClickFn
+         * @param {Object} event The fired `click` event payload
+         */
+        _defaultReadOnlyClickFn: function _defaultReadOnlyClickFn(event) {
+            if (event.listenerData.editor.editable().editor.fire('readOnlyClick', event.data) !== false) {
+                var ckElement = new CKEDITOR.dom.elementPath(event.data.getTarget(), this);
+                var link = ckElement.lastElement;
+
+                if (link) {
+                    var href = link.$.attributes.href ? link.$.attributes.href.value : null;
+
+                    var target = link.$.attributes.target ? link.$.attributes.target.value : null;
+
+                    this._redirectLink(href, target);
+                }
             }
         },
 
@@ -4310,32 +5804,65 @@ CKEDITOR.tools.buildTableMap = function (table) {
         },
 
         /**
-         * Renders the specified from the user toolbars
+         * Fired when readonly value is changed. Adds click event listener to handle links in readonly mode.
+         *
+         * @protected
+         * @method _onReadOnlyChange
+         * @param {Object} event The fired event
+         */
+        _onReadOnlyChangeFn: function _onReadOnlyChangeFn(event) {
+            if (event.editor.readOnly) {
+                this._addReadOnlyLinkClickListener(event.editor);
+            } else {
+                event.editor.editable().removeListener('click', this._defaultReadOnlyClickFn);
+            }
+        },
+
+        /**
+         * Redirects the browser to a given link
+         *
+         * @protected
+         * @method _redirectLink
+         * @param {string} href The href to take the browser to
+         * @param {string=} target Specifies where to display the link
+         */
+        _redirectLink: function _redirectLink(href, target) {
+            if (target && href) {
+                window.open(href, target);
+            } else if (href) {
+                window.location.href = href;
+            }
+        },
+
+        /**
+         * Renders the specified from the user toolbars.
          *
          * @protected
          * @method _renderUI
          */
         _renderUI: function _renderUI() {
-            var editorUIElement = document.createElement('div');
-            editorUIElement.className = 'ae-ui';
+            if (!this._destroyed) {
+                var editorUIElement = document.createElement('div');
+                editorUIElement.className = 'ae-ui';
 
-            var uiNode = this.get('uiNode') || document.body;
+                var uiNode = this.get('uiNode') || document.body;
 
-            uiNode.appendChild(editorUIElement);
+                uiNode.appendChild(editorUIElement);
 
-            this._mainUI = React.render(React.createElement(AlloyEditor.UI, {
-                editor: this,
-                eventsDelay: this.get('eventsDelay'),
-                toolbars: this.get('toolbars')
-            }), editorUIElement);
+                this._mainUI = ReactDOM.render(React.createElement(AlloyEditor.UI, {
+                    editor: this,
+                    eventsDelay: this.get('eventsDelay'),
+                    toolbars: this.get('toolbars')
+                }), editorUIElement);
 
-            this._editorUIElement = editorUIElement;
+                this._editorUIElement = editorUIElement;
 
-            this.get('nativeEditor').fire('uiReady');
+                this.get('nativeEditor').fire('uiReady');
+            }
         },
 
         /**
-         * The function returns an HTML element from the passed value. If the passed value is a string, it should be 
+         * The function returns an HTML element from the passed value. If the passed value is a string, it should be
          * the Id of the element which have to be retrieved from the DOM.
          * If an HTML Element is passed, the element itself will be returned.
          *
@@ -4433,7 +5960,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
              */
             extraPlugins: {
                 validator: AlloyEditor.Lang.isString,
-                value: 'uicore,selectionregion,dragresize,addimages,placeholder,tabletools,tableresize,autolink',
+                value: 'ae_uicore,ae_selectionregion,ae_selectionkeystrokes,ae_dragresize,ae_imagealignment,ae_addimages,ae_placeholder,ae_tabletools,ae_tableresize,ae_autolink,ae_embed,ae_autolist',
                 writeOnce: true
             },
 
@@ -4451,7 +5978,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
 
             /**
              * Specifies the class, which should be added by Placeholder plugin
-             * {{#crossLink "CKEDITOR.plugins.placeholder}}{{/crossLink}}
+             * {{#crossLink "CKEDITOR.plugins.ae_placeholder}}{{/crossLink}}
              * when editor is not focused.
              *
              * @property placeholderClass
@@ -4488,6 +6015,26 @@ CKEDITOR.tools.buildTableMap = function (table) {
             },
 
             /**
+             * Array of manual selection triggers. They can be configured to manually show a specific selection toolbar
+             * by forcing the selection type. A selectionKeystroke item consists of a keys property with a [CKEditor keystroke
+             * definition](http://docs.ckeditor.com/#!/api/CKEDITOR.config-cfg-keystrokes) and a selection property with
+             * the selection name to trigger.
+             *
+             * @property selectionKeystrokes
+             * @type {Array}
+             */
+            selectionKeystrokes: {
+                validator: AlloyEditor.Lang.isArray,
+                value: [{
+                    keys: CKEDITOR.CTRL + 76 /*L*/
+                    , selection: 'link'
+                }, {
+                    keys: CKEDITOR.CTRL + CKEDITOR.SHIFT + 76 /*L*/
+                    , selection: 'embed'
+                }]
+            },
+
+            /**
              * The Node ID or HTMl node, which AlloyEditor should use as an editable area.
              *
              * @property srcNode
@@ -4508,7 +6055,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
                 validator: '_validateToolbars',
                 value: {
                     add: {
-                        buttons: ['image', 'camera', 'hline', 'table'],
+                        buttons: ['image', 'embed', 'camera', 'hline', 'table'],
                         tabIndex: 2
                     },
                     styles: {
@@ -4552,6 +6099,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonActionStyle
      */
+
     var ButtonActionStyle = {
         /**
          * Removes or applies the component style to the current selection.
@@ -4585,10 +6133,41 @@ CKEDITOR.tools.buildTableMap = function (table) {
     'use strict';
 
     /**
+     * ButtonCommandActive is a mixin that provides an `isActive` method to determine if
+     * a context-aware command is currently in an active state.
+     *
+     * @class ButtonCommandActive
+     */
+
+    var ButtonCommandActive = {
+        /**
+         * Checks if the command is active in the current selection.
+         *
+         * @method isActive
+         * @return {Boolean} True if the command is active, false otherwise.
+         */
+        isActive: function isActive() {
+            var editor = this.props.editor.get('nativeEditor');
+
+            var command = editor.getCommand(this.props.command);
+
+            return command ? command.state === CKEDITOR.TRISTATE_ON : false;
+        }
+    };
+
+    AlloyEditor.ButtonCommandActive = ButtonCommandActive;
+})();
+'use strict';
+
+(function () {
+    'use strict';
+
+    /**
      * ButtonCommand is a mixin that executes a command via CKEDITOR's API.
      *
      * @class ButtonCommand
      */
+
     var ButtonCommand = {
         // Allows validating props being passed to the component.
         propTypes: {
@@ -4635,6 +6214,123 @@ CKEDITOR.tools.buildTableMap = function (table) {
     'use strict';
 
     /**
+     * ButtonKeystroke is a mixin that provides a `keystroke` prop that allows configuring
+     * a function of the instance to be invoked upon the keystroke activation.
+     *
+     * @class ButtonKeystroke
+     */
+
+    var ButtonKeystroke = {
+        // Allows validating props being passed to the component.
+        propTypes: {
+            /**
+             * The keystroke definition. An object with the following properties:
+             * - fn: The function to be executed
+             * - keys: The keystroke definition, as expected by http://docs.ckeditor.com/#!/api/CKEDITOR.editor-method-setKeystroke
+             * - name: The name for the CKEditor command that will be created. If empty,
+             * a random name will be created on the fly
+             * @property {Object} keystroke
+             */
+            keystroke: React.PropTypes.object.isRequired
+        },
+
+        /**
+         * Lifecycle. Invoked once, both on the client and server, immediately before the initial rendering occurs.
+         *
+         * @method componentWillMount
+         */
+        componentWillMount: function componentWillMount() {
+            var nativeEditor = this.props.editor.get('nativeEditor');
+            var keystroke = this.props.keystroke;
+
+            var commandName = keystroke.name || (Math.random() * 1e9 >>> 0).toString();
+
+            var command = nativeEditor.getCommand(commandName);
+
+            if (!command) {
+                command = new CKEDITOR.command(nativeEditor, {
+                    exec: function (editor) {
+                        var keystrokeFn = keystroke.fn;
+
+                        if (AlloyEditor.Lang.isString(keystrokeFn)) {
+                            this[keystrokeFn].call(this, editor);
+                        } else if (AlloyEditor.Lang.isFunction(keystrokeFn)) {
+                            keystrokeFn.call(this, editor);
+                        }
+                    }.bind(this)
+                });
+
+                nativeEditor.addCommand(commandName, command);
+            }
+
+            this._defaultKeystrokeCommand = nativeEditor.keystrokeHandler.keystrokes[keystroke.keys];
+
+            nativeEditor.setKeystroke(keystroke.keys, commandName);
+        },
+
+        /**
+         * Lifecycle. Invoked immediately before a component is unmounted from the DOM.
+         *
+         * @method componentWillUnmount
+         */
+        componentWillUnmount: function componentWillUnmount() {
+            this.props.editor.get('nativeEditor').setKeystroke(this.props.keystroke.keys, this._defaultKeystrokeCommand);
+        }
+    };
+
+    AlloyEditor.ButtonKeystroke = ButtonKeystroke;
+})();
+'use strict';
+
+(function () {
+  'use strict';
+
+  /**
+   * ButtonCfgProps is a mixin that provides a style prop and some methods to apply the resulting
+   * style and checking if it is present in a given path or selection.
+   *
+   * @class ButtonCfgProps
+   */
+
+  var ButtonCfgProps = {
+    // Allows validating props being passed to the component.
+    propTypes: {
+      /**
+       * The editor instance where the component is being used.
+       *
+       * @property {Object} editor
+       */
+      editor: React.PropTypes.object.isRequired
+    },
+
+    /**
+     * Merges the properties, passed to the current component with user's configuration
+     * via `buttonCfg` property.
+     *
+     * @method mergeButtonCfgProps
+     * @param {Object} props The properties to be merged with the provided configuration for this
+     * button. If not passed, the user configuration will be merged with `this.props`
+     * @return {Object} The merged properties
+     */
+    mergeButtonCfgProps: function mergeButtonCfgProps(props) {
+      props = props || this.props;
+
+      var nativeEditor = this.props.editor.get('nativeEditor');
+      var buttonCfg = nativeEditor.config.buttonCfg || {};
+      var result = CKEDITOR.tools.merge(props, buttonCfg[AlloyEditor.ButtonLinkEdit.key]);
+
+      return result;
+    }
+  };
+
+  AlloyEditor.ButtonCfgProps = ButtonCfgProps;
+})();
+'use strict';
+
+(function () {
+    'use strict';
+
+    /**
      * ButtonStateClasses is a mixin that decorates the domElement of a component
      * with different CSS classes based on the current state of the element.
      *
@@ -4644,6 +6340,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonStateClasses
      */
+
     var ButtonStateClasses = {
         /**
          * Returns the list of state classes associated to the current element's state, according
@@ -4682,15 +6379,20 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonStyle
      */
+
     var ButtonStyle = {
         // Allows validating props being passed to the component.
         propTypes: {
             /**
-             * The style the button should handle as described by http://docs.ckeditor.com/#!/api/CKEDITOR.style
+             * The style the button should handle. Allowed values are:
+             * - Object as described by http://docs.ckeditor.com/#!/api/CKEDITOR.style.
+             * - String pointing to an object inside the editor instance configuration. For example, `style = 'coreStyles_bold'` will try to
+             * retrieve the style object from `editor.config.coreStyles_bold`. Nested properties such as `style = 'myplugin.myConfig.myStyle'`
+             * are also supported and will try to retrieve the style object from the editor configuration as well.
              *
-             * @property {Object} style
+             * @property {Object|String} style
              */
-            style: React.PropTypes.object
+            style: React.PropTypes.oneOfType([React.PropTypes.object, React.PropTypes.string])
         },
 
         /**
@@ -4699,7 +6401,25 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @method componentWillMount
          */
         componentWillMount: function componentWillMount() {
-            this._style = new CKEDITOR.style(this.props.style);
+            var Lang = AlloyEditor.Lang;
+            var style = this.props.style;
+
+            if (Lang.isString(style)) {
+                var parts = style.split('.');
+                var currentMember = this.props.editor.get('nativeEditor').config;
+                var property = parts.shift();
+
+                while (property && Lang.isObject(currentMember) && Lang.isObject(currentMember[property])) {
+                    currentMember = currentMember[property];
+                    property = parts.shift();
+                }
+
+                if (Lang.isObject(currentMember)) {
+                    style = currentMember;
+                }
+            }
+
+            this._style = new CKEDITOR.style(style);
         },
 
         /**
@@ -4753,6 +6473,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ToolbarButtons
      */
+
     var ToolbarButtons = {
         /**
          * Analyzes the current selection and the buttons exclusive mode value to figure out which
@@ -4766,13 +6487,17 @@ CKEDITOR.tools.buildTableMap = function (table) {
         getToolbarButtons: function getToolbarButtons(buttons, additionalProps) {
             var buttonProps = {};
 
+            var nativeEditor = this.props.editor.get('nativeEditor');
+            var buttonCfg = nativeEditor.config.buttonCfg || {};
+
             var toolbarButtons = this.filterExclusive(buttons.filter(function (button) {
                 return button && (AlloyEditor.Buttons[button] || AlloyEditor.Buttons[button.name]);
             }).map(function (button) {
                 if (AlloyEditor.Lang.isString(button)) {
+                    buttonProps[button] = buttonCfg[button];
                     button = AlloyEditor.Buttons[button];
                 } else if (AlloyEditor.Lang.isString(button.name)) {
-                    buttonProps[AlloyEditor.Buttons[button.name].key] = button.cfg;
+                    buttonProps[AlloyEditor.Buttons[button.name].key] = CKEDITOR.tools.merge(buttonCfg[button], button.cfg);
                     button = AlloyEditor.Buttons[button.name];
                 }
 
@@ -4789,8 +6514,10 @@ CKEDITOR.tools.buildTableMap = function (table) {
                 props = this.mergeDropdownProps(props, button.key);
 
                 if (additionalProps) {
-                    props = CKEDITOR.tools.merge(props, additionalProps, buttonProps[button.key]);
+                    props = CKEDITOR.tools.merge(props, additionalProps);
                 }
+
+                props = CKEDITOR.tools.merge(props, buttonProps[button.key]);
 
                 return React.createElement(button, props);
             }, this);
@@ -4812,6 +6539,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class WidgetArrowBox
      */
+
     var WidgetArrowBox = {
         /**
          * Returns the list of arrow box classes associated to the current element's state. It relies
@@ -4847,6 +6575,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class WidgetDropdown
      */
+
     var WidgetDropdown = {
         /**
          * Lifecycle. Invoked when a component is receiving new props.
@@ -4908,7 +6637,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
                     if (this.moveFocus) {
                         this.moveFocus(toggleDirection);
                     } else {
-                        React.findDOMNode(this).focus();
+                        ReactDOM.findDOMNode(this).focus();
                     }
                 }
             });
@@ -4930,6 +6659,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class WidgetExclusive
      */
+
     var WidgetExclusive = {
         /**
          * Cancels the exclusive state of an widget.
@@ -4970,7 +6700,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @return {Array|Object} The item with executive state.
          */
         filterExclusive: function filterExclusive(items) {
-            return items.filter((function (item) {
+            return items.filter(function (item) {
                 if (this.state.itemExclusive) {
                     if (this.state.itemExclusive === item.key) {
                         return item;
@@ -4978,7 +6708,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
                 } else {
                     return item;
                 }
-            }).bind(this));
+            }.bind(this));
         },
 
         /**
@@ -5038,6 +6768,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
     var WidgetFocusManager = {
         // Allows validating props being passed to the component.
         propTypes: {
+
             /**
              * Callback method to be invoked when the focus manager is to be dismissed. This happens
              * in the following scenarios if a dismiss callback has been specified:
@@ -5056,6 +6787,12 @@ CKEDITOR.tools.buildTableMap = function (table) {
              * @property {boolean} circular
              */
             circular: React.PropTypes.bool.isRequired,
+
+            /**
+            * Indicate if should focus the first child of a container
+            * @property {Boolean} focusFirstChild
+            */
+            focusFirstChild: React.PropTypes.bool,
 
             /**
              * String representing the CSS selector used to define the elements that should be handled.
@@ -5104,7 +6841,16 @@ CKEDITOR.tools.buildTableMap = function (table) {
         focus: function focus(event) {
             if (!event || this._isValidTarget(event.target)) {
                 if (this._descendants) {
-                    this._descendants[this._activeDescendant].focus();
+                    var activeDescendantEl = this._descendants[this._activeDescendant];
+                    // When user clicks with the mouse, the activeElement is already set and there
+                    // is no need to focus it. Focusing of the active descendant (usually some button) is required
+                    // in case of keyboard navigation, because the focused element might be not the first button,
+                    // but the div element, which contains the button.
+                    if (document.activeElement !== activeDescendantEl && !this.props.focusFirstChild) {
+                        if (this._descendants.indexOf(document.activeElement) === -1) {
+                            activeDescendantEl.focus();
+                        }
+                    }
 
                     if (event) {
                         event.stopPropagation();
@@ -5317,27 +7063,41 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @method _refresh
          */
         _refresh: function _refresh() {
-            var domNode = React.findDOMNode(this);
+            var domNode = ReactDOM.findDOMNode(this);
 
             if (domNode) {
                 var descendants = domNode.querySelectorAll(this.props.descendants);
 
-                this._descendants = Array.prototype.map.call(descendants, function (item) {
-                    return item;
-                }).sort(function (a, b) {
+                var priorityDescendants = [];
+
+                this._descendants = [];
+
+                Array.prototype.slice.call(descendants).forEach(function (item) {
+                    var dataTabIndex = item.getAttribute('data-tabindex');
+
+                    if (dataTabIndex) {
+                        priorityDescendants.push(item);
+                    } else {
+                        this._descendants.push(item);
+                    }
+                }.bind(this));
+
+                priorityDescendants = priorityDescendants.sort(function (a, b) {
                     return AlloyEditor.Lang.toInt(a.getAttribute('data-tabindex')) > AlloyEditor.Lang.toInt(b.getAttribute('data-tabindex'));
                 });
 
+                this._descendants = priorityDescendants.concat(this._descendants);
+
                 this._activeDescendant = 0;
 
-                this._descendants.some((function (item, index) {
+                this._descendants.some(function (item, index) {
                     if (item.getAttribute('tabindex') === '0') {
                         this._activeDescendant = index;
                         this.focus();
 
                         return true;
                     }
-                }).bind(this));
+                }.bind(this));
             }
         }
     };
@@ -5354,6 +7114,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class WidgetInteractionPoint
      */
+
     var WidgetInteractionPoint = {
         // Allows validating props being passed to the component.
         propTypes: {
@@ -5371,7 +7132,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          *
          * It depends on the props editorEvent to analyze the following user-interaction parameters:
          * - {Object} selectionData The data about the selection in the editor as returned from
-         * {{#crossLink "CKEDITOR.plugins.selectionregion/getSelectionData:method"}}{{/crossLink}}
+         * {{#crossLink "CKEDITOR.plugins.ae_selectionregion/getSelectionData:method"}}{{/crossLink}}
          * - {Number} pos Contains the coordinates of the position, considered as most appropriate.
          * This may be the point where the user released the mouse, or just the beginning or the end of
          * the selection.
@@ -5389,9 +7150,10 @@ CKEDITOR.tools.buildTableMap = function (table) {
             }
 
             var selectionData = eventPayload.selectionData;
+
             var pos = {
                 x: eventPayload.nativeEvent.pageX,
-                y: eventPayload.nativeEvent.pageY
+                y: selectionData.region.top
             };
 
             var direction = selectionData.region.direction;
@@ -5439,7 +7201,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @protected
          * @method _getXPoint
          * @param {Object} selectionData The data about the selection in the editor as
-         * returned from {{#crossLink "CKEDITOR.plugins.selectionregion/getSelectionData:method"}}{{/crossLink}}
+         * returned from {{#crossLink "CKEDITOR.plugins.ae_selectionregion/getSelectionData:method"}}{{/crossLink}}
          * @param {Object} eventX The X coordinate received from the native event (mouseup).
          * @return {Number} The calculated X point in page coordinates.
          */
@@ -5484,16 +7246,29 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class WidgetPosition
      */
+
     var WidgetPosition = {
         mixins: [AlloyEditor.WidgetInteractionPoint],
 
         // Allows validating props being passed to the component.
         propTypes: {
             /**
+             * Should the widget to be restricted to the viewport, or not.
+             *
+             * @property {Boolean} constrainToViewport
+             * @default true
+             */
+            constrainToViewport: React.PropTypes.bool,
+
+            /**
              * The gutter (vertical and horizontal) between the interaction point and where the widget
              * should be rendered.
              *
              * @property {Object} gutter
+             * @default {
+             *     left: 0,
+             *     top: 10
+             * }
              */
             gutter: React.PropTypes.object
         },
@@ -5508,7 +7283,8 @@ CKEDITOR.tools.buildTableMap = function (table) {
                 gutter: {
                     left: 0,
                     top: 10
-                }
+                },
+                constrainToViewport: true
             };
         },
 
@@ -5524,6 +7300,41 @@ CKEDITOR.tools.buildTableMap = function (table) {
         },
 
         /**
+         * Returns an object which contains the position of the element in page coordinates,
+         * restricted to fit to given viewport.
+         *
+         * @method getConstrainedPosition
+         * @param {Object} attrs The following properties, provided as numbers:
+         * - height
+         * - left
+         * - top
+         * - width
+         * @param {Object} viewPaneSize Optional. If not provided, the current viewport will be used. Should contain at least these properties:
+         * - width
+         * @return {Object} An object with `x` and `y` properties, which represent the constrained position of the
+         * element.
+         */
+        getConstrainedPosition: function getConstrainedPosition(attrs, viewPaneSize) {
+            viewPaneSize = viewPaneSize || new CKEDITOR.dom.window(window).getViewPaneSize();
+
+            var x = attrs.left;
+            var y = attrs.top;
+
+            if (attrs.left + attrs.width > viewPaneSize.width) {
+                x -= attrs.left + attrs.width - viewPaneSize.width;
+            }
+
+            if (y < 0) {
+                y = 0;
+            }
+
+            return {
+                x: x,
+                y: y
+            };
+        },
+
+        /**
          * Returns the position of the Widget taking in consideration the
          * {{#crossLink "WidgetPosition/gutter:attribute"}}{{/crossLink}} attribute.
          *
@@ -5536,7 +7347,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @return {Array} An Array with left and top offsets in page coordinates.
          */
         getWidgetXYPoint: function getWidgetXYPoint(left, top, direction) {
-            var domNode = React.findDOMNode(this);
+            var domNode = ReactDOM.findDOMNode(this);
 
             var gutter = this.props.gutter;
 
@@ -5569,7 +7380,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @return {Boolean} True if the widget is visible, false otherwise
          */
         isVisible: function isVisible() {
-            var domNode = this.getDOMNode();
+            var domNode = ReactDOM.findDOMNode(this);
 
             if (domNode) {
                 var domElement = new CKEDITOR.dom.element(domNode);
@@ -5588,7 +7399,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @param  {Object} endPoint The destination point for the movement.
          */
         moveToPoint: function moveToPoint(startPoint, endPoint) {
-            var domElement = new CKEDITOR.dom.element(this.getDOMNode());
+            var domElement = new CKEDITOR.dom.element(ReactDOM.findDOMNode(this));
 
             domElement.setStyles({
                 left: startPoint[0] + 'px',
@@ -5602,8 +7413,8 @@ CKEDITOR.tools.buildTableMap = function (table) {
                 domElement.addClass('ae-toolbar-transition');
                 domElement.addClass('alloy-editor-visible');
                 domElement.setStyles({
-                    left: endPoint[0],
-                    top: endPoint[1],
+                    left: endPoint[0] + 'px',
+                    top: endPoint[1] + 'px',
                     opacity: 1
                 });
             });
@@ -5615,7 +7426,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @method show
          */
         show: function show() {
-            var domNode = React.findDOMNode(this);
+            var domNode = ReactDOM.findDOMNode(this);
 
             if (!this.isVisible() && domNode) {
                 var interactionPoint = this.getInteractionPoint();
@@ -5625,8 +7436,20 @@ CKEDITOR.tools.buildTableMap = function (table) {
 
                     var finalX, finalY, initialX, initialY;
 
-                    finalX = initialX = domElement.getStyle('left');
-                    finalY = initialY = domElement.getStyle('top');
+                    finalX = initialX = parseFloat(domElement.getStyle('left'));
+                    finalY = initialY = parseFloat(domElement.getStyle('top'));
+
+                    if (this.props.constrainToViewport) {
+                        var res = this.getConstrainedPosition({
+                            height: parseFloat(domNode.offsetHeight),
+                            left: finalX,
+                            top: finalY,
+                            width: parseFloat(domNode.offsetWidth)
+                        });
+
+                        finalX = res.x;
+                        finalY = res.y;
+                    }
 
                     if (interactionPoint.direction === CKEDITOR.SELECTION_TOP_TO_BOTTOM) {
                         initialY = this.props.selectionData.region.bottom;
@@ -5647,14 +7470,12 @@ CKEDITOR.tools.buildTableMap = function (table) {
         updatePosition: function updatePosition() {
             var interactionPoint = this.getInteractionPoint();
 
-            var domNode = React.findDOMNode(this);
+            var domNode = ReactDOM.findDOMNode(this);
 
             if (interactionPoint && domNode) {
                 var xy = this.getWidgetXYPoint(interactionPoint.x, interactionPoint.y, interactionPoint.direction);
 
-                var domElement = new CKEDITOR.dom.element(domNode);
-
-                domElement.setStyles({
+                new CKEDITOR.dom.element(domNode).setStyles({
                     left: xy[0] + 'px',
                     top: xy[1] + 'px'
                 });
@@ -5688,15 +7509,17 @@ CKEDITOR.tools.buildTableMap = function (table) {
      * The ButtonBold class provides functionality for styling an selection with strong (bold) style.
      *
      * @uses ButtonCommand
+     * @uses ButtonKeystroke
      * @uses ButtonStateClasses
      * @uses ButtonStyle
      *
      * @class ButtonBold
      */
+
     var ButtonBold = React.createClass({
         displayName: 'ButtonBold',
 
-        mixins: [AlloyEditor.ButtonStyle, AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonCommand],
+        mixins: [AlloyEditor.ButtonStyle, AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonCommand, AlloyEditor.ButtonKeystroke],
 
         // Allows validating props being passed to the component.
         propTypes: {
@@ -5744,9 +7567,11 @@ CKEDITOR.tools.buildTableMap = function (table) {
         getDefaultProps: function getDefaultProps() {
             return {
                 command: 'bold',
-                style: {
-                    element: 'strong'
-                }
+                keystroke: {
+                    fn: 'execCommand',
+                    keys: CKEDITOR.CTRL + 66 /*B*/
+                },
+                style: 'coreStyles_bold'
             };
         },
 
@@ -5779,6 +7604,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonCameraImage
      */
+
     var ButtonCameraImage = React.createClass({
         displayName: 'ButtonCameraImage',
 
@@ -5813,7 +7639,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @method componentDidMount
          */
         componentDidMount: function componentDidMount() {
-            React.findDOMNode(this.refs.buttonTakePhoto).focus();
+            ReactDOM.findDOMNode(this.refs.buttonTakePhoto).focus();
         },
 
         /**
@@ -5823,7 +7649,13 @@ CKEDITOR.tools.buildTableMap = function (table) {
          */
         componentWillUnmount: function componentWillUnmount() {
             if (this._stream) {
-                this._stream.stop();
+                if (this._stream.stop) {
+                    this._stream.stop();
+                } else if (this._stream.getVideoTracks) {
+                    this._stream.getVideoTracks().forEach(function (track) {
+                        track.stop();
+                    });
+                }
                 this._stream = null;
             }
         },
@@ -5865,8 +7697,8 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @method takePhoto
          */
         takePhoto: function takePhoto() {
-            var videoEl = React.findDOMNode(this.refs.videoContainer);
-            var canvasEl = React.findDOMNode(this.refs.canvasContainer);
+            var videoEl = ReactDOM.findDOMNode(this.refs.videoContainer);
+            var canvasEl = ReactDOM.findDOMNode(this.refs.canvasContainer);
 
             var context = canvasEl.getContext('2d');
 
@@ -5914,10 +7746,10 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @param {Object} stream The video stream
          */
         _handleStreamSuccess: function _handleStreamSuccess(stream) {
-            var videoEl = React.findDOMNode(this.refs.videoContainer);
-            var canvasEl = React.findDOMNode(this.refs.canvasContainer);
+            var videoEl = ReactDOM.findDOMNode(this.refs.videoContainer);
+            var canvasEl = ReactDOM.findDOMNode(this.refs.canvasContainer);
 
-            videoEl.addEventListener('canplay', (function (event) {
+            videoEl.addEventListener('canplay', function (event) {
                 var height = videoEl.videoHeight / (videoEl.videoWidth / this.props.videoWidth);
 
                 if (isNaN(height)) {
@@ -5930,7 +7762,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
                 canvasEl.setAttribute('height', height);
 
                 this._videoHeight = height;
-            }).bind(this), false);
+            }.bind(this), false);
 
             this._stream = stream;
 
@@ -5942,7 +7774,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
 
             videoEl.play();
 
-            React.findDOMNode(this.refs.buttonTakePhoto).disabled = false;
+            ReactDOM.findDOMNode(this.refs.buttonTakePhoto).disabled = false;
         }
 
         /**
@@ -5968,6 +7800,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonCamera
      */
+
     var ButtonCamera = React.createClass({
         displayName: 'ButtonCamera',
 
@@ -6018,11 +7851,13 @@ CKEDITOR.tools.buildTableMap = function (table) {
             if (this.props.renderExclusive) {
                 return React.createElement(AlloyEditor.ButtonCameraImage, this.props);
             } else {
-                var disabled = !(navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
+                var disabled = !(navigator.getUserMedia || navigator.webkitGetUserMedia && location.protocol === 'https' || navigator.mozGetUserMedia || navigator.msGetUserMedia);
+
+                var label = disabled ? AlloyEditor.Strings.cameraDisabled : AlloyEditor.Strings.camera;
 
                 return React.createElement(
                     'button',
-                    { 'aria-label': AlloyEditor.Strings.camera, className: 'ae-button', 'data-type': 'button-image-camera', disabled: disabled, onClick: this.props.requestExclusive.bind(ButtonCamera.key), tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.camera },
+                    { 'aria-label': label, className: 'ae-button', 'data-type': 'button-image-camera', disabled: disabled, onClick: this.props.requestExclusive.bind(ButtonCamera.key), tabIndex: this.props.tabIndex, title: label },
                     React.createElement('span', { className: 'ae-icon-camera' })
                 );
             }
@@ -6045,6 +7880,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonCode
      */
+
     var ButtonCode = React.createClass({
         displayName: 'ButtonCode',
 
@@ -6133,6 +7969,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonCommandListItem
      */
+
     var ButtonCommandListItem = React.createClass({
         displayName: 'ButtonCommandListItem',
 
@@ -6212,6 +8049,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonCommandsList
      */
+
     var ButtonCommandsList = React.createClass({
         displayName: 'ButtonCommandsList',
 
@@ -6261,7 +8099,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @method componentDidMount
          */
         componentDidMount: function componentDidMount() {
-            React.findDOMNode(this).focus();
+            ReactDOM.findDOMNode(this).focus();
         },
 
         /**
@@ -6335,6 +8173,430 @@ CKEDITOR.tools.buildTableMap = function (table) {
     'use strict';
 
     /**
+     * The ButtonDropdown class provides markup and keyboard navigation behaviour to a dropdown
+     * opened from a button.
+     *
+     * @class ButtonDropdown
+     */
+
+    var ButtonDropdown = React.createClass({
+        displayName: 'ButtonDropdown',
+
+        mixins: [AlloyEditor.WidgetFocusManager],
+
+        /**
+         * Lifecycle. Returns the default values of the properties used in the widget.
+         *
+         * @method getDefaultProps
+         */
+        getDefaultProps: function getDefaultProps() {
+            return {
+                circular: false,
+                descendants: '.ae-toolbar-element',
+                keys: {
+                    dismiss: [27],
+                    dismissNext: [39],
+                    dismissPrev: [37],
+                    next: [40],
+                    prev: [38]
+                }
+            };
+        },
+
+        // Lifecycle. Provides static properties to the widget.
+        statics: {
+            /**
+             * The name which will be used as an alias of the dropdown in the configuration.
+             *
+             * @static
+             * @property {String} key
+             * @default dropdown
+             */
+            key: 'dropdown'
+        },
+
+        /**
+         * Lifecycle. Renders the UI of the button.
+         *
+         * @method render
+         * @return {Object} The content which should be rendered.
+         */
+        render: function render() {
+            return React.createElement(
+                'div',
+                { className: 'ae-dropdown ae-arrow-box ae-arrow-box-top-left', onFocus: this.focus, onKeyDown: this.handleKey, tabIndex: '0' },
+                React.createElement(
+                    'ul',
+                    { className: 'ae-listbox', role: 'listbox' },
+                    this.props.children
+                )
+            );
+        }
+    });
+
+    AlloyEditor.Buttons[ButtonDropdown.key] = AlloyEditor.ButtonDropdown = ButtonDropdown;
+})();
+'use strict';
+
+(function () {
+    'use strict';
+
+    var KEY_ENTER = 13;
+    var KEY_ESC = 27;
+
+    /**
+     * The ButtonEmbedEdit class provides functionality for creating and editing an embed link in a document.
+     * Provides UI for creating and editing an embed link.
+     *
+     * @class ButtonEmbedEdit
+     */
+    var ButtonEmbedEdit = React.createClass({
+        displayName: 'ButtonEmbedEdit',
+
+        // Allows validating props being passed to the component.
+        propTypes: {
+            /**
+             * The editor instance where the component is being used.
+             *
+             * @property {Object} editor
+             */
+            editor: React.PropTypes.object.isRequired
+        },
+
+        // Lifecycle. Provides static properties to the widget.
+        statics: {
+            /**
+             * The name which will be used as an alias of the button in the configuration.
+             *
+             * @static
+             * @property {String} key
+             * @default embedEdit
+             */
+            key: 'embedEdit'
+        },
+
+        /**
+         * Lifecycle. Invoked once, only on the client, immediately after the initial rendering occurs.
+         *
+         * Focuses on the link input to immediately allow editing. This should only happen if the component
+         * is rendered in exclusive mode to prevent aggressive focus stealing.
+         *
+         * @method componentDidMount
+         */
+        componentDidMount: function componentDidMount() {
+            if (this.props.renderExclusive || this.props.manualSelection) {
+                // We need to wait for the next rendering cycle before focusing to avoid undesired
+                // scrolls on the page
+                if (window.requestAnimationFrame) {
+                    window.requestAnimationFrame(this._focusLinkInput);
+                } else {
+                    setTimeout(this._focusLinkInput, 0);
+                }
+            }
+        },
+
+        /**
+         * Lifecycle. Invoked when a component is receiving new props.
+         * This method is not called for the initial render.
+         *
+         * @method componentWillReceiveProps
+         */
+        componentWillReceiveProps: function componentWillReceiveProps(nextProps) {
+            this.replaceState(this.getInitialState());
+        },
+
+        /**
+         * Lifecycle. Invoked once before the component is mounted.
+         * The return value will be used as the initial value of this.state.
+         *
+         * @method getInitialState
+         */
+        getInitialState: function getInitialState() {
+            var editor = this.props.editor.get('nativeEditor');
+            var embed;
+
+            var selection = editor.getSelection();
+
+            if (selection) {
+                var selectedElement = selection.getSelectedElement();
+
+                if (selectedElement) {
+                    embed = selectedElement.findOne('[data-widget="ae_embed"]');
+                }
+            }
+
+            var href = embed ? embed.getAttribute('data-ae-embed-url') : '';
+
+            return {
+                element: embed,
+                initialLink: {
+                    href: href
+                },
+                linkHref: href
+            };
+        },
+
+        /**
+         * Lifecycle. Renders the UI of the button.
+         *
+         * @method render
+         * @return {Object} The content which should be rendered.
+         */
+        render: function render() {
+            var clearLinkStyle = {
+                opacity: this.state.linkHref ? 1 : 0
+            };
+
+            return React.createElement(
+                'div',
+                { className: 'ae-container-edit-link' },
+                React.createElement(
+                    'button',
+                    { 'aria-label': AlloyEditor.Strings.deleteEmbed, className: 'ae-button', 'data-type': 'button-embed-remove', disabled: !this.state.element, onClick: this._removeEmbed, tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.deleteEmbed },
+                    React.createElement('span', { className: 'ae-icon-bin' })
+                ),
+                React.createElement(
+                    'div',
+                    { className: 'ae-container-input xxl' },
+                    React.createElement('input', { className: 'ae-input', onChange: this._handleLinkHrefChange, onKeyDown: this._handleKeyDown, placeholder: AlloyEditor.Strings.editLink, ref: 'linkInput', type: 'text', value: this.state.linkHref }),
+                    React.createElement('button', { 'aria-label': AlloyEditor.Strings.clearInput, className: 'ae-button ae-icon-remove', onClick: this._clearLink, style: clearLinkStyle, title: AlloyEditor.Strings.clear })
+                ),
+                React.createElement(
+                    'button',
+                    { 'aria-label': AlloyEditor.Strings.confirm, className: 'ae-button', disabled: !this._isValidState(), onClick: this._embedLink, title: AlloyEditor.Strings.confirm },
+                    React.createElement('span', { className: 'ae-icon-ok' })
+                )
+            );
+        },
+
+        /**
+         * Clears the link input. This only changes the component internal state, but does not
+         * affect the link element of the editor. Only the _removeLink and _updateLink methods
+         * are translated to the editor element.
+         *
+         * @protected
+         * @method _clearLink
+         */
+        _clearLink: function _clearLink() {
+            this.setState({
+                linkHref: ''
+            });
+        },
+
+        /**
+         * Triggers the embedUrl command to transform the link into an embed media object
+         *
+         * @protected
+         * @method _embedLink
+         */
+        _embedLink: function _embedLink() {
+            var nativeEditor = this.props.editor.get('nativeEditor');
+
+            nativeEditor.execCommand('embedUrl', {
+                url: this.state.linkHref
+            });
+
+            // We need to cancelExclusive with the bound parameters in case the button is used
+            // inside another in exclusive mode (such is the case of the link button)
+            this.props.cancelExclusive();
+        },
+
+        /**
+         * Focuses the user cursor on the widget's input.
+         *
+         * @protected
+         * @method _focusLinkInput
+         */
+        _focusLinkInput: function _focusLinkInput() {
+            ReactDOM.findDOMNode(this.refs.linkInput).focus();
+        },
+
+        /**
+         * Monitors key interaction inside the input element to respond to the keys:
+         * - Enter: Creates/updates the link.
+         * - Escape: Discards the changes.
+         *
+         * @protected
+         * @method _handleKeyDown
+         * @param {SyntheticEvent} event The keyboard event.
+         */
+        _handleKeyDown: function _handleKeyDown(event) {
+            if (event.keyCode === KEY_ENTER || event.keyCode === KEY_ESC) {
+                event.preventDefault();
+            }
+
+            if (event.keyCode === KEY_ENTER) {
+                this._embedLink();
+            } else if (event.keyCode === KEY_ESC) {
+                var editor = this.props.editor.get('nativeEditor');
+
+                // We need to cancelExclusive with the bound parameters in case the button is used
+                // inside another in exclusive mode (such is the case of the link button)
+                this.props.cancelExclusive();
+
+                editor.fire('actionPerformed', this);
+            }
+        },
+
+        /**
+         * Updates the component state when the link input changes on user interaction.
+         *
+         * @protected
+         * @method _handleLinkHrefChange
+         * @param {SyntheticEvent} event The change event.
+         */
+        _handleLinkHrefChange: function _handleLinkHrefChange(event) {
+            this.setState({
+                linkHref: event.target.value
+            });
+        },
+
+        /**
+         * Verifies that the current link state is valid so the user can save the link. A valid state
+         * means that we have a non-empty href that's different from the original one.
+         *
+         * @method _isValidState
+         * @protected
+         * @return {Boolean} True if the state is valid, false otherwise
+         */
+        _isValidState: function _isValidState() {
+            var validState = this.state.linkHref && this.state.linkHref !== this.state.initialLink.href;
+
+            return validState;
+        },
+
+        /**
+         * Removes the embed in the editor element.
+         *
+         * @protected
+         * @method _removeEmbed
+         */
+        _removeEmbed: function _removeEmbed() {
+            var editor = this.props.editor.get('nativeEditor');
+
+            var embedWrapper = this.state.element.getAscendant(function (element) {
+                return element.hasClass('cke_widget_wrapper');
+            });
+
+            embedWrapper.remove();
+
+            editor.fire('actionPerformed', this);
+        }
+    });
+
+    AlloyEditor.Buttons[ButtonEmbedEdit.key] = AlloyEditor.ButtonEmbedEdit = ButtonEmbedEdit;
+})();
+'use strict';
+
+(function () {
+    'use strict';
+
+    /**
+     * The ButtonEmbed class provides functionality for creating and editing an embed link in a document.
+     * ButtonEmbed renders in two different modes:
+     *
+     * - Normal: Just a button that allows to switch to the edition mode
+     * - Exclusive: The ButtonEmbedEdit UI with all the link edition controls.
+     *
+     * @uses ButtonKeystroke
+     *
+     * @class ButtonEmbed
+     */
+
+    var ButtonEmbed = React.createClass({
+        displayName: 'ButtonEmbed',
+
+        mixins: [AlloyEditor.ButtonKeystroke],
+
+        // Allows validating props being passed to the component.
+        propTypes: {
+            /**
+             * The editor instance where the component is being used.
+             *
+             * @property {Object} editor
+             */
+            editor: React.PropTypes.object.isRequired,
+
+            /**
+             * The label that should be used for accessibility purposes.
+             *
+             * @property {String} label
+             */
+            label: React.PropTypes.string,
+
+            /**
+             * The tabIndex of the button in its toolbar current state. A value other than -1
+             * means that the button has focus and is the active element.
+             *
+             * @property {Number} tabIndex
+             */
+            tabIndex: React.PropTypes.number
+        },
+
+        // Lifecycle. Provides static properties to the widget.
+        statics: {
+            /**
+             * The name which will be used as an alias of the button in the configuration.
+             *
+             * @static
+             * @property {String} key
+             * @default embed
+             */
+            key: 'embed'
+        },
+
+        /**
+         * Lifecycle. Returns the default values of the properties used in the widget.
+         *
+         * @method getDefaultProps
+         * @return {Object} The default properties.
+         */
+        getDefaultProps: function getDefaultProps() {
+            return {
+                keystroke: {
+                    fn: '_requestExclusive',
+                    keys: CKEDITOR.CTRL + CKEDITOR.SHIFT + 76 /*L*/
+                }
+            };
+        },
+
+        /**
+         * Lifecycle. Renders the UI of the button.
+         *
+         * @method render
+         * @return {Object} The content which should be rendered.
+         */
+        render: function render() {
+            if (this.props.renderExclusive) {
+                return React.createElement(AlloyEditor.ButtonEmbedEdit, this.props);
+            } else {
+                return React.createElement(
+                    'button',
+                    { 'aria-label': AlloyEditor.Strings.link, className: 'ae-button', 'data-type': 'button-embed', onClick: this._requestExclusive, tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.link },
+                    React.createElement('span', { className: 'ae-icon-add' })
+                );
+            }
+        },
+
+        /**
+         * Requests the link button to be rendered in exclusive mode to allow the embedding of a link.
+         *
+         * @protected
+         * @method _requestExclusive
+         */
+        _requestExclusive: function _requestExclusive() {
+            this.props.requestExclusive(ButtonEmbed.key);
+        }
+    });
+
+    AlloyEditor.Buttons[ButtonEmbed.key] = AlloyEditor.ButtonEmbed = ButtonEmbed;
+})();
+'use strict';
+
+(function () {
+    'use strict';
+
+    /**
      * The ButtonH1 class provides wraps a selection in `h1` element.
      *
      * @uses ButtonActionStyle
@@ -6343,6 +8605,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonH1
      */
+
     var ButtonH1 = React.createClass({
         displayName: 'ButtonH1',
 
@@ -6432,6 +8695,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonH2
      */
+
     var ButtonH2 = React.createClass({
         displayName: 'ButtonH2',
 
@@ -6520,6 +8784,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonHline
      */
+
     var ButtonHline = React.createClass({
         displayName: 'ButtonHline',
 
@@ -6600,18 +8865,107 @@ CKEDITOR.tools.buildTableMap = function (table) {
     'use strict';
 
     /**
+     * The ButtonImageAlignCenter class provides functionality for aligning an image in the center.
+     *
+     * @uses ButtonCommand
+     * @uses ButtonCommandActive
+     * @uses ButtonStateClasses
+     *
+     * @class ButtonImageAlignCenter
+     */
+
+    var ButtonImageAlignCenter = React.createClass({
+        displayName: 'ButtonImageAlignCenter',
+
+        mixins: [AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonCommand, AlloyEditor.ButtonCommandActive],
+
+        // Allows validating props being passed to the component.
+        propTypes: {
+            /**
+             * The editor instance where the component is being used.
+             *
+             * @property {Object} editor
+             */
+            editor: React.PropTypes.object.isRequired,
+
+            /**
+             * The label that should be used for accessibility purposes.
+             *
+             * @property {String} label
+             */
+            label: React.PropTypes.string,
+
+            /**
+             * The tabIndex of the button in its toolbar current state. A value other than -1
+             * means that the button has focus and is the active element.
+             *
+             * @property {Number} tabIndex
+             */
+            tabIndex: React.PropTypes.number
+        },
+
+        // Lifecycle. Provides static properties to the widget.
+        statics: {
+            /**
+             * The name which will be used as an alias of the button in the configuration.
+             *
+             * @static
+             * @property {String} key
+             * @default imageCenter
+             */
+            key: 'imageCenter'
+        },
+
+        /**
+         * Lifecycle. Returns the default values of the properties used in the widget.
+         *
+         * @method getDefaultProps
+         * @return {Object} The default properties.
+         */
+        getDefaultProps: function getDefaultProps() {
+            return {
+                command: 'justifycenter'
+            };
+        },
+
+        /**
+         * Lifecycle. Renders the UI of the button.
+         *
+         * @method render
+         * @return {Object} The content which should be rendered.
+         */
+        render: function render() {
+            var cssClass = 'ae-button ' + this.getStateClasses();
+
+            return React.createElement(
+                'button',
+                { 'aria-label': AlloyEditor.Strings.alignCenter, 'aria-pressed': cssClass.indexOf('pressed') !== -1, className: cssClass, 'data-type': 'button-image-align-center', onClick: this.execCommand, tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.alignCenter },
+                React.createElement('span', { className: 'ae-icon-align-center' })
+            );
+        }
+    });
+
+    AlloyEditor.Buttons[ButtonImageAlignCenter.key] = AlloyEditor.ButtonImageAlignCenter = ButtonImageAlignCenter;
+})();
+'use strict';
+
+(function () {
+    'use strict';
+
+    /**
      * The ButtonImageAlignLeft class provides functionality for aligning an image on left.
      *
-     * @uses ButtonActionStyle
+     * @uses ButtonCommand
+     * @uses ButtonCommandActive
      * @uses ButtonStateClasses
-     * @uses ButtonStyle
      *
      * @class ButtonImageAlignLeft
      */
+
     var ButtonImageAlignLeft = React.createClass({
         displayName: 'ButtonImageAlignLeft',
 
-        mixins: [AlloyEditor.ButtonStyle, AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonActionStyle],
+        mixins: [AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonCommand, AlloyEditor.ButtonCommandActive],
 
         // Allows validating props being passed to the component.
         propTypes: {
@@ -6658,12 +9012,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          */
         getDefaultProps: function getDefaultProps() {
             return {
-                style: {
-                    element: 'img',
-                    styles: {
-                        'float': 'left'
-                    }
-                }
+                command: 'justifyleft'
             };
         },
 
@@ -6678,7 +9027,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
 
             return React.createElement(
                 'button',
-                { 'aria-label': AlloyEditor.Strings.alignLeft, 'aria-pressed': cssClass.indexOf('pressed') !== -1, className: cssClass, 'data-type': 'button-image-align-left', onClick: this.applyStyle, tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.alignLeft },
+                { 'aria-label': AlloyEditor.Strings.alignLeft, 'aria-pressed': cssClass.indexOf('pressed') !== -1, className: cssClass, 'data-type': 'button-image-align-left', onClick: this.execCommand, tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.alignLeft },
                 React.createElement('span', { className: 'ae-icon-align-left' })
             );
         }
@@ -6694,16 +9043,17 @@ CKEDITOR.tools.buildTableMap = function (table) {
     /**
      * The ButtonImageAlignRight class provides functionality for aligning an image on right.
      *
-     * @uses ButtonActionStyle
+     * @uses ButtonCommand
+     * @uses ButtonCommandActive
      * @uses ButtonStateClasses
-     * @uses ButtonStyle
      *
      * @class ButtonImageAlignRight
      */
+
     var ButtonImageAlignRight = React.createClass({
         displayName: 'ButtonImageAlignRight',
 
-        mixins: [AlloyEditor.ButtonStyle, AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonActionStyle],
+        mixins: [AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonCommand, AlloyEditor.ButtonCommandActive],
 
         // Allows validating props being passed to the component.
         propTypes: {
@@ -6750,12 +9100,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          */
         getDefaultProps: function getDefaultProps() {
             return {
-                style: {
-                    element: 'img',
-                    styles: {
-                        'float': 'right'
-                    }
-                }
+                command: 'justifyright'
             };
         },
 
@@ -6770,7 +9115,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
 
             return React.createElement(
                 'button',
-                { 'aria-label': AlloyEditor.Strings.alignRight, 'aria-pressed': cssClass.indexOf('pressed') !== -1, className: cssClass, 'data-type': 'button-image-align-right', onClick: this.applyStyle, tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.alignRight },
+                { 'aria-label': AlloyEditor.Strings.alignRight, 'aria-pressed': cssClass.indexOf('pressed') !== -1, className: cssClass, 'data-type': 'button-image-align-right', onClick: this.execCommand, tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.alignRight },
                 React.createElement('span', { className: 'ae-icon-align-right' })
             );
         }
@@ -6788,6 +9133,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonImage
      */
+
     var ButtonImage = React.createClass({
         displayName: 'ButtonImage',
 
@@ -6845,7 +9191,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
                     { 'aria-label': AlloyEditor.Strings.image, className: 'ae-button', 'data-type': 'button-image', onClick: this.handleClick, tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.image },
                     React.createElement('span', { className: 'ae-icon-image' })
                 ),
-                React.createElement('input', { onChange: this._onInputChange, ref: 'fileInput', style: inputSyle, type: 'file' })
+                React.createElement('input', { accept: 'image/*', onChange: this._onInputChange, ref: 'fileInput', style: inputSyle, type: 'file' })
             );
         },
 
@@ -6856,13 +9202,15 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @param {SyntheticEvent} event The received click event on the button.
          */
         handleClick: function handleClick(event) {
-            React.findDOMNode(this.refs.fileInput).click();
+            ReactDOM.findDOMNode(this.refs.fileInput).click();
         },
 
         /**
-         * On input change, reads the chosen file and creates an img element with src the image data as Data URI.
-         * Then, fires an {{#crossLink "ButtonImage/imageAdd:event"}}{{/crossLink}} via CKEditor's
-         * message system. The passed params will be:
+         * On input change, reads the chosen file and fires an event `beforeImageAdd` with the image which will be added
+         * to the content. The image file will be passed in the `imageFiles` property.
+         * If any of the listeners returns `false` or cancels the event, the image won't be added to the content.
+         * Otherwise, an event `imageAdd` will be fired with the inserted element into the editable area.
+         * The passed params will be:
          * - `el` - the created img element
          * - `file` - the original image file from the input element
          *
@@ -6870,36 +9218,58 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @method _onInputChange
          */
         _onInputChange: function _onInputChange() {
-            var reader = new FileReader();
-            var inputEl = React.findDOMNode(this.refs.fileInput);
+            var inputEl = ReactDOM.findDOMNode(this.refs.fileInput);
 
-            reader.onload = (function (event) {
+            // On IE11 the function might be called with an empty array of
+            // files. In such a case, no actions will be taken.
+            if (!inputEl.files.length) {
+                return;
+            }
+
+            var reader = new FileReader();
+            var file = inputEl.files[0];
+
+            reader.onload = function (event) {
                 var editor = this.props.editor.get('nativeEditor');
 
-                var el = CKEDITOR.dom.element.createFromHtml('<img src="' + event.target.result + '">');
+                var result = editor.fire('beforeImageAdd', {
+                    imageFiles: file
+                });
 
-                editor.insertElement(el);
+                if (!!result) {
+                    var el = CKEDITOR.dom.element.createFromHtml('<img src="' + event.target.result + '">');
 
-                editor.fire('actionPerformed', this);
+                    editor.insertElement(el);
 
-                var imageData = {
-                    el: el,
-                    file: inputEl.files[0]
-                };
+                    editor.fire('actionPerformed', this);
 
-                editor.fire('imageAdd', imageData);
-            }).bind(this);
+                    var imageData = {
+                        el: el,
+                        file: file
+                    };
 
-            reader.readAsDataURL(inputEl.files[0]);
+                    editor.fire('imageAdd', imageData);
+                }
+            }.bind(this);
+
+            reader.readAsDataURL(file);
 
             inputEl.value = '';
         }
 
         /**
-         * Fired when an image file is added as an element to the editor.
+         * Fired before adding images to the editor.
+         *
+         * @event beforeImageAdd
+         * @param {Array} imageFiles Array of image files
+         */
+
+        /**
+         * Fired when an image is being added to the editor successfully.
          *
          * @event imageAdd
-         * @param {CKEDITOR.dom.element} el The created image with src as Data URI.
+         * @param {CKEDITOR.dom.element} el The created image with src as Data URI
+         * @param {File} file The image file
          */
     });
 
@@ -6911,18 +9281,109 @@ CKEDITOR.tools.buildTableMap = function (table) {
     'use strict';
 
     /**
+        * The ButtonIndentBlock class provides functionality for indenting the selected blocks.
+        *
+        * @uses ButtonCommand
+        * @uses ButtonCommandActive
+        * @uses ButtonStateClasses
+        *
+        * @class ButtonIndentBlock
+        */
+
+    var ButtonIndentBlock = React.createClass({
+        displayName: 'ButtonIndentBlock',
+
+        mixins: [AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonCommand, AlloyEditor.ButtonCommandActive],
+
+        //Allows validating props being passed to the component
+        propTypes: {
+            /**
+                  * The editor instance where the component is being used.
+                  *
+                  * @property {Object} editor
+                  */
+            editor: React.PropTypes.object.isRequired,
+
+            /**
+             * The label that should be used for accessibility purposes.
+             *
+             * @property {String} label
+             */
+            label: React.PropTypes.string,
+
+            /**
+             * The tabIndex of the button in its toolbar current state. A value other than -1
+             * means that the button has focus and is the active element.
+             *
+             * @property {Number} tabIndex
+             */
+            tabIndex: React.PropTypes.number
+        },
+
+        // Lifecycle. Provides static properties to the widget.
+        statics: {
+            /**
+                  * The name which will be used as an alias of the button in the configuration.
+                  *
+                  * @static
+                  * @property {String} key
+                  * @default indentBlock
+                  */
+            key: 'indentBlock'
+        },
+
+        /**
+           * Lifecycle. Returns the default values of the properties used in the widget.
+           *
+           * @method getDefaultProps
+           * @return {Object} The default properties.
+           */
+        getDefaultProps: function getDefaultProps() {
+            return {
+                command: 'indent'
+            };
+        },
+
+        /**
+         * Lifecycle. Renders the UI of the button.
+         *
+         * @method render
+         * @return {Object} The content which should be rendered.
+         */
+        render: function render() {
+            var cssClass = 'ae-button ' + this.getStateClasses();
+
+            return React.createElement(
+                'button',
+                { 'aria-label': AlloyEditor.Strings.indent, 'aria-pressed': cssClass.indexOf('pressed') !== -1, className: cssClass, 'data-type': 'button-indent-block', onClick: this.execCommand, tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.indent },
+                React.createElement('span', { className: 'ae-icon-indent-block' })
+            );
+        }
+
+    });
+
+    AlloyEditor.Buttons[ButtonIndentBlock.key] = AlloyEditor.ButtonIndentBlock = ButtonIndentBlock;
+})();
+'use strict';
+
+(function () {
+    'use strict';
+
+    /**
      * The ButtonItalic class provides functionality for styling an selection with italic (em) style.
      *
      * @uses ButtonCommand
+     * @uses ButtonKeystroke
      * @uses ButtonStateClasses
      * @uses ButtonStyle
      *
      * @class ButtonItalic
      */
+
     var ButtonItalic = React.createClass({
         displayName: 'ButtonItalic',
 
-        mixins: [AlloyEditor.ButtonStyle, AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonCommand],
+        mixins: [AlloyEditor.ButtonStyle, AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonCommand, AlloyEditor.ButtonKeystroke],
 
         // Allows validating props being passed to the component.
         propTypes: {
@@ -6970,9 +9431,11 @@ CKEDITOR.tools.buildTableMap = function (table) {
         getDefaultProps: function getDefaultProps() {
             return {
                 command: 'italic',
-                style: {
-                    element: 'em'
-                }
+                keystroke: {
+                    fn: 'execCommand',
+                    keys: CKEDITOR.CTRL + 73 /*I*/
+                },
+                style: 'coreStyles_italic'
             };
         },
 
@@ -7000,17 +9463,288 @@ CKEDITOR.tools.buildTableMap = function (table) {
 (function () {
     'use strict';
 
-    var KEY_ENTER = 13;
-    var KEY_ESC = 27;
+    /**
+     * The ButtonLinkAutocompleteList class provides functionality for showing a list of
+     * items that can be selected for the link.
+     *
+     * @uses WidgetFocusManager
+     *
+     * @class ButtonLinkAutocompleteList
+     */
+
+    var ButtonLinkAutocompleteList = React.createClass({
+        displayName: 'ButtonLinkAutocompleteList',
+
+        mixins: [AlloyEditor.WidgetFocusManager],
+
+        // Allows validating props being passed to the component.
+        propTypes: {
+            /**
+             * Autocomplete function
+             *
+             * @property {Function} data
+             */
+            data: React.PropTypes.func,
+
+            /**
+             * Indicates if this is focused when this component is updated
+             *
+             * @property {Boolean} autocompleteSelected
+             */
+            autocompleteSelected: React.PropTypes.bool,
+
+            /**
+             * The current term to autocomplete for
+             *
+             * @property {String} term
+             */
+            term: React.PropTypes.string,
+
+            /**
+            * Method to update parent selectautocomplete state
+            *
+            * @property {Function} setAutocompleteState
+            */
+            setAutocompleteState: React.PropTypes.func
+
+        },
+
+        // Lifecycle. Provides static properties to the widget.
+        statics: {
+            /**
+             * The name which will be used as an alias of the button in the configuration.
+             *
+             * @static
+             * @property {String} key
+             * @default buttonLinkAutocompleteList
+             */
+            key: 'buttonLinkAutocompleteList'
+        },
+
+        /**
+         * Lifecycle. Invoked when a component is receiving new props.
+         * This method is not called for the initial render.
+         *
+         * @method componentWillReceiveProps
+         */
+        componentWillReceiveProps: function componentWillReceiveProps(nextProps) {
+            if (!nextProps.term || nextProps.term !== this.props.term) {
+                clearTimeout(this._timeout);
+
+                if (nextProps.term) {
+                    this._timeout = setTimeout(this._updateItems, this.props.delay);
+                } else {
+                    this.setState({
+                        items: []
+                    });
+                }
+            }
+
+            if (nextProps.autocompleteSelected) {
+                setTimeout(this.focus, 0);
+                this.props.setAutocompleteState({
+                    selected: false
+                });
+            }
+        },
+
+        /**
+         * Lifecycle. Invoked immediately before a component is unmounted from the DOM.
+         *
+         * @method componentWillUnmount
+         */
+        componentWillUnmount: function componentWillUnmount() {
+            clearTimeout(this._timeout);
+        },
+
+        /**
+         * Lifecycle. Returns the default values of the properties used in the widget.
+         *
+         * @method getDefaultProps
+         * @return {Object} The default properties.
+         */
+        getDefaultProps: function getDefaultProps() {
+            return {
+                circular: false,
+                data: [],
+                delay: 100,
+                descendants: '.ae-toolbar-element',
+                keys: {
+                    dismiss: [27],
+                    dismissNext: [39],
+                    dismissPrev: [37],
+                    next: [40],
+                    prev: [38]
+                }
+            };
+        },
+
+        /**
+         * Lifecycle. Invoked once before the component is mounted.
+         * The return value will be used as the initial value of this.state.
+         *
+         * @method getInitialState
+         */
+        getInitialState: function getInitialState() {
+            return {
+                items: []
+            };
+        },
+
+        /**
+         * Lifecycle. Renders the UI of the list.
+         *
+         * @method render
+         * @return {Object} The content which should be rendered.
+         */
+        render: function render() {
+            if (!this.props.expanded || !this.state.items.length) {
+                return null;
+            }
+
+            return React.createElement(
+                AlloyEditor.ButtonDropdown,
+                null,
+                this._renderAutocompleteItems(this.state.items)
+            );
+        },
+
+        /**
+         * Lifecycle. Invoked before rendering when new props or state are being received.
+         * This method is not called for the initial render or when forceUpdate is used.
+         *
+         * @method  shouldComponentUpdate
+         * @return {Boolean} Returns false when the transition to the new props and state will not
+         * require a component update.
+         */
+        shouldComponentUpdate: function shouldComponentUpdate(nextProps, nextState) {
+            return nextProps.expanded !== this.props.expanded || nextProps.term !== this.props.term || nextState.items !== this.state.items;
+        },
+
+        /**
+         * Renders a set of list items for the provided items
+         *
+         * @protected
+         * @method _renderAutocompleteItems
+         * @param {Array} items List of autocomplete items to render
+         * @return {Array} Rendered list item instances
+         */
+        _renderAutocompleteItems: function _renderAutocompleteItems(items) {
+            items = items || [];
+
+            var handleLinkAutocompleteClick = this.props.handleLinkAutocompleteClick;
+
+            return items.map(function (item) {
+                return React.createElement(
+                    'li',
+                    { key: item.url, role: 'option' },
+                    React.createElement(
+                        'button',
+                        { className: 'ae-toolbar-element', onClick: handleLinkAutocompleteClick, 'data-value': item.url },
+                        item.title
+                    )
+                );
+            });
+        },
+
+        /**
+         * Retrieves the data according to {this.props.term} and calls setState() with the returned data
+         *
+         * @protected
+         * @method _updateItems
+         */
+        _updateItems: function _updateItems() {
+            var instance = this;
+
+            if (!this.props.term) {
+                return;
+            }
+
+            var promise = Promise.resolve(this.props.data(this.props.term));
+
+            promise.then(function (items) {
+                if (items.length) {
+                    !instance.props.expanded && instance.props.toggleDropdown();
+                }
+
+                instance.setState({
+                    items: items
+                });
+            });
+        }
+    });
+
+    AlloyEditor.ButtonLinkAutocompleteList = ButtonLinkAutocompleteList;
+})();
+'use strict';
+
+(function () {
+    'use strict';
 
     /**
-     * The ButtonEditLink class provides functionality for creating and editing a link in a document.
+     * The ButtonLinkEdit class provides functionality for creating and editing a link in a document.
      * Provides UI for creating, editing and removing a link.
+     *
+     * @uses WidgetDropdown
+     * @uses WidgetFocusManager
+     * @uses ButtonCfgProps
      *
      * @class ButtonLinkEdit
      */
+
     var ButtonLinkEdit = React.createClass({
         displayName: 'ButtonLinkEdit',
+
+        mixins: [AlloyEditor.WidgetDropdown, AlloyEditor.WidgetFocusManager, AlloyEditor.ButtonCfgProps],
+
+        // Allows validating props being passed to the component.
+        propTypes: {
+            /**
+             * List of the allowed values for the target attribute.
+             *
+             * @property {Array} allowedTargets
+             */
+            allowedTargets: React.PropTypes.arrayOf(React.PropTypes.object),
+
+            /**
+             * Indicate if we add http:// protocol to link or not
+             *
+             * @property {Boolean} appendProtocol
+             */
+            appendProtocol: React.PropTypes.bool,
+
+            /**
+             * The editor instance where the component is being used.
+             *
+             * @property {Object} editor
+             */
+            editor: React.PropTypes.object.isRequired,
+
+            /**
+             * Default value of the link target attribute.
+             *
+             * @property {String} defaultLinkTarget
+             */
+            defaultLinkTarget: React.PropTypes.string,
+
+            /**
+             * Indicates whether the link target selector should appear.
+             *
+             * @property {Boolean} showTargetSelector
+             */
+            showTargetSelector: React.PropTypes.bool,
+
+            /**
+             * List of items to be rendered as possible values for the link or a function, which is
+             * supposed to retrieve the data. The function should return a Promise.
+             * The returned items must be objects with at least two properties:
+             * - title
+             * - url
+             *
+             * @property {Function|Array} data
+             */
+            data: React.PropTypes.oneOfType([React.PropTypes.func, React.PropTypes.arrayOf(React.PropTypes.object)])
+        },
 
         // Lifecycle. Provides static properties to the widget.
         statics: {
@@ -7027,18 +9761,52 @@ CKEDITOR.tools.buildTableMap = function (table) {
         /**
          * Lifecycle. Invoked once, only on the client, immediately after the initial rendering occurs.
          *
-         * Focuses on the link input to immediately allow editing.
+         * Focuses on the link input to immediately allow editing. This should only happen if the component
+         * is rendered in exclusive mode to prevent aggressive focus stealing.
          *
          * @method componentDidMount
          */
         componentDidMount: function componentDidMount() {
-            // We need to wait for the next rendering cycle before focusing to avoid undesired
-            // scrolls on the page
-            if (window.requestAnimationFrame) {
-                window.requestAnimationFrame(this._focusLinkInput);
-            } else {
-                setTimeout(this._focusLinkInput, 0);
+            if (this.props.renderExclusive || this.props.manualSelection) {
+                // We need to wait for the next rendering cycle before focusing to avoid undesired
+                // scrolls on the page
+                this._focusLinkInput();
             }
+        },
+
+        /**
+         * Lifecycle. Invoked when a component is receiving new props.
+         * This method is not called for the initial render.
+         *
+         * @method componentWillReceiveProps
+         */
+        componentWillReceiveProps: function componentWillReceiveProps(nextProps) {
+            this.replaceState(this.getInitialState());
+        },
+
+        /**
+         * Lifecycle. Returns the default values of the properties used in the widget.
+         *
+         * @method getDefaultProps
+         * @return {Object} The default properties.
+         */
+        getDefaultProps: function getDefaultProps() {
+            return {
+                defaultLinkTarget: '',
+                showTargetSelector: true,
+                appendProtocol: true,
+                autocompleteUrl: '',
+                circular: true,
+                descendants: '.ae-toolbar-element',
+                keys: {
+                    dismiss: [27],
+                    dismissNext: [39],
+                    dismissPrev: [37],
+                    next: [40],
+                    prev: [38]
+                },
+                customIndexStart: true
+            };
         },
 
         /**
@@ -7050,10 +9818,17 @@ CKEDITOR.tools.buildTableMap = function (table) {
         getInitialState: function getInitialState() {
             var link = new CKEDITOR.Link(this.props.editor.get('nativeEditor')).getFromSelection();
             var href = link ? link.getAttribute('href') : '';
+            var target = link ? link.getAttribute('target') : this.props.defaultLinkTarget;
 
             return {
+                autocompleteSelected: false,
                 element: link,
-                linkHref: href
+                initialLink: {
+                    href: href,
+                    target: target
+                },
+                linkHref: href,
+                linkTarget: target
             };
         },
 
@@ -7068,6 +9843,42 @@ CKEDITOR.tools.buildTableMap = function (table) {
                 opacity: this.state.linkHref ? 1 : 0
             };
 
+            var targetSelector = {
+                editor: this.props.editor,
+                handleLinkTargetChange: this._handleLinkTargetChange,
+                selectedTarget: this.state.linkTarget || AlloyEditor.Strings.linkTargetDefault
+            };
+
+            targetSelector = this.mergeDropdownProps(targetSelector, AlloyEditor.ButtonLinkTargetEdit.key);
+
+            var autocompleteDropdown;
+
+            if (this.props.data) {
+                var dataFn = this.props.data;
+
+                if (!AlloyEditor.Lang.isFunction(dataFn)) {
+                    var items = this.props.data;
+
+                    dataFn = function dataFn(term) {
+                        return items;
+                    };
+                }
+
+                var autocompleteDropdownProps = {
+                    data: dataFn,
+                    editor: this.props.editor,
+                    handleLinkAutocompleteClick: this._handleLinkAutocompleteClick,
+                    onDismiss: this.props.toggleDropdown,
+                    term: this.state.linkHref,
+                    autocompleteSelected: this.state.autocompleteSelected,
+                    setAutocompleteState: this._setAutocompleteState
+                };
+
+                autocompleteDropdownProps = this.mergeDropdownProps(autocompleteDropdownProps, AlloyEditor.ButtonLinkAutocompleteList.key);
+
+                autocompleteDropdown = React.createElement(AlloyEditor.ButtonLinkAutocompleteList, autocompleteDropdownProps);
+            }
+
             return React.createElement(
                 'div',
                 { className: 'ae-container-edit-link' },
@@ -7078,13 +9889,19 @@ CKEDITOR.tools.buildTableMap = function (table) {
                 ),
                 React.createElement(
                     'div',
-                    { className: 'ae-container-input' },
-                    React.createElement('input', { className: 'ae-input', onChange: this._handleLinkChange, onKeyDown: this._handleKeyDown, placeholder: AlloyEditor.Strings.editLink, ref: 'linkInput', type: 'text', value: this.state.linkHref }),
+                    { className: 'ae-container-input xxl' },
+                    React.createElement(AlloyEditor.ButtonLinkTargetEdit, targetSelector),
+                    React.createElement(
+                        'div',
+                        { className: 'ae-container-input xxl' },
+                        React.createElement('input', { className: 'ae-input', onChange: this._handleLinkHrefChange, onKeyDown: this._handleKeyDown, placeholder: AlloyEditor.Strings.editLink, ref: 'linkInput', type: 'text', value: this.state.linkHref }),
+                        autocompleteDropdown
+                    ),
                     React.createElement('button', { 'aria-label': AlloyEditor.Strings.clearInput, className: 'ae-button ae-icon-remove', onClick: this._clearLink, style: clearLinkStyle, title: AlloyEditor.Strings.clear })
                 ),
                 React.createElement(
                     'button',
-                    { 'aria-label': AlloyEditor.Strings.confirm, className: 'ae-button', disabled: !this.state.linkHref, onClick: this._updateLink, title: AlloyEditor.Strings.confirm },
+                    { 'aria-label': AlloyEditor.Strings.confirm, className: 'ae-button', disabled: !this._isValidState(), onClick: this._updateLink, title: AlloyEditor.Strings.confirm },
                     React.createElement('span', { className: 'ae-icon-ok' })
                 )
             );
@@ -7111,7 +9928,17 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @method _focusLinkInput
          */
         _focusLinkInput: function _focusLinkInput() {
-            React.findDOMNode(this.refs.linkInput).focus();
+            var instance = this;
+
+            var focusLinkEl = function focusLinkEl() {
+                ReactDOM.findDOMNode(instance.refs.linkInput).focus();
+            };
+
+            if (window.requestAnimationFrame) {
+                window.requestAnimationFrame(focusLinkEl);
+            } else {
+                setTimeout(focusLinkEl, 0);
+            }
         },
 
         /**
@@ -7124,16 +9951,22 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @param {SyntheticEvent} event The keyboard event.
          */
         _handleKeyDown: function _handleKeyDown(event) {
-            if (event.keyCode === KEY_ENTER || event.keyCode === KEY_ESC) {
+            if (event.keyCode === 13 || event.keyCode === 27) {
                 event.preventDefault();
             }
 
-            if (event.keyCode === KEY_ENTER) {
+            if (event.keyCode === 13) {
                 this._updateLink();
-            } else if (event.keyCode === KEY_ESC) {
-                this.props.cancelExclusive();
+            } else if (event.keyCode === 40) {
+                this.setState({
+                    autocompleteSelected: true
+                });
+            } else if (event.keyCode === 27) {
+                var editor = this.props.editor.get('nativeEditor');
 
-                this.props.editor.get('nativeEditor').focus();
+                new CKEDITOR.Link(editor).advanceSelection();
+
+                this.props.editor.get('nativeEditor').fire('actionPerformed', this);
             }
         },
 
@@ -7141,13 +9974,62 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * Updates the component state when the link input changes on user interaction.
          *
          * @protected
-         * @method _handleLinkChange
+         * @method _handleLinkHrefChange
          * @param {SyntheticEvent} event The change event.
          */
-        _handleLinkChange: function _handleLinkChange(event) {
+        _handleLinkHrefChange: function _handleLinkHrefChange(event) {
             this.setState({
                 linkHref: event.target.value
             });
+
+            this._focusLinkInput();
+        },
+
+        /**
+         * Updates the component state when the link target changes on user interaction.
+         *
+         * @protected
+         * @method _handleLinkTargetChange
+         * @param {SyntheticEvent} event The click event.
+         */
+        _handleLinkTargetChange: function _handleLinkTargetChange(event) {
+            this.setState({
+                itemDropdown: null,
+                linkTarget: event.target.getAttribute('data-value')
+            });
+
+            this._focusLinkInput();
+        },
+
+        /**
+         * Updates the component state when an autocomplete link result is selected by user interaction.
+         *
+         * @protected
+         * @method _handleLinkAutocompleteClick
+         * @param {SyntheticEvent} event The click event.
+         */
+        _handleLinkAutocompleteClick: function _handleLinkAutocompleteClick(event) {
+            this.setState({
+                itemDropdown: null,
+                linkHref: event.target.getAttribute('data-value')
+            });
+
+            this._focusLinkInput();
+        },
+
+        /**
+         * Verifies that the current link state is valid so the user can save the link. A valid state
+         * means that we have a non-empty href and that either that or the link target are different
+         * from the original link.
+         *
+         * @protected
+         * @method _isValidState
+         * @return {Boolean} [description]
+         */
+        _isValidState: function _isValidState() {
+            var validState = this.state.linkHref && (this.state.linkHref !== this.state.initialLink.href || this.state.linkTarget !== this.state.initialLink.target);
+
+            return validState;
         },
 
         /**
@@ -7162,7 +10044,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
             var selection = editor.getSelection();
             var bookmarks = selection.createBookmarks();
 
-            linkUtils.remove(this.state.element);
+            linkUtils.remove(this.state.element, { advance: true });
 
             selection.selectBookmarks(bookmarks);
 
@@ -7174,6 +10056,18 @@ CKEDITOR.tools.buildTableMap = function (table) {
         },
 
         /**
+         * Update autocompleteSelected state to focus and select autocomplete´s dropdown
+         *
+         * @protected
+         * @method _setAutocompleteState
+         */
+        _setAutocompleteState: function _setAutocompleteState(state) {
+            this.setState({
+                autocompleteSelected: state.selected
+            });
+        },
+
+        /**
          * Updates the link in the editor element. If the element didn't exist previously, it will
          * create a new <a> element with the href specified in the link input.
          *
@@ -7182,13 +10076,19 @@ CKEDITOR.tools.buildTableMap = function (table) {
          */
         _updateLink: function _updateLink() {
             var editor = this.props.editor.get('nativeEditor');
-            var linkUtils = new CKEDITOR.Link(editor);
+            var linkUtils = new CKEDITOR.Link(editor, { appendProtocol: this.props.appendProtocol });
+            var linkAttrs = {
+                target: this.state.linkTarget
+            };
+            var modifySelection = { advance: true };
 
             if (this.state.linkHref) {
                 if (this.state.element) {
-                    linkUtils.update(this.state.linkHref, this.state.element);
+                    linkAttrs.href = this.state.linkHref;
+
+                    linkUtils.update(linkAttrs, this.state.element, modifySelection);
                 } else {
-                    linkUtils.create(this.state.linkHref);
+                    linkUtils.create(this.state.linkHref, linkAttrs, modifySelection);
                 }
 
                 editor.fire('actionPerformed', this);
@@ -7208,20 +10108,126 @@ CKEDITOR.tools.buildTableMap = function (table) {
     'use strict';
 
     /**
+     * The ButtonLinkTargetEdit class provides functionality for changing the target of a link
+     * in the document.
+     *
+     * @class ButtonLinkTargetEdit
+     */
+
+    var ButtonLinkTargetEdit = React.createClass({
+        displayName: 'ButtonLinkTargetEdit',
+
+        // Allows validating props being passed to the component.
+        propTypes: {
+            /**
+             * List of the allowed items for the target attribute. Every allowed target is an object
+             * with a `label` attribute that will be shown in the dropdown and a `value` attribute
+             * that will get set as the link target attribute.
+             * @property {Array<object>} allowedTargets
+             */
+            allowedTargets: React.PropTypes.arrayOf(React.PropTypes.object),
+
+            /**
+             * The editor instance where the component is being used.
+             *
+             * @property {Object} editor
+             */
+            editor: React.PropTypes.object.isRequired,
+
+            /**
+             * Label of the current target value.
+             *
+             * @property {String} selectedTarget
+             */
+            selectedTarget: React.PropTypes.string
+        },
+
+        // Lifecycle. Provides static properties to the widget.
+        statics: {
+            /**
+             * The name which will be used as an alias of the button in the configuration.
+             *
+             * @static
+             * @property {String} key
+             * @default linkTargetEdit
+             */
+            key: 'linkTargetEdit'
+        },
+
+        /**
+         * Lifecycle. Renders the UI of the button.
+         *
+         * @method render
+         * @return {Object} The content which should be rendered.
+         */
+        render: function render() {
+            var buttonTargetsList;
+
+            var handleLinkTargetChange = this.props.handleLinkTargetChange;
+
+            if (this.props.expanded) {
+                buttonTargetsList = React.createElement(AlloyEditor.ButtonTargetList, { editor: this.props.editor, onDismiss: this.props.toggleDropdown, handleLinkTargetChange: handleLinkTargetChange });
+            }
+
+            return React.createElement(
+                'div',
+                { className: 'ae-container-edit-link-target ae-container-dropdown ae-container-dropdown-medium ae-has-dropdown', tabIndex: '0' },
+                React.createElement(
+                    'button',
+                    { 'aria-expanded': this.props.expanded, 'aria-label': this.props.selectedTarget, className: 'ae-toolbar-element', onClick: this.props.toggleDropdown, role: 'combobox', tabIndex: this.props.tabIndex, title: this.props.selectedTarget },
+                    React.createElement(
+                        'div',
+                        { className: 'ae-container' },
+                        React.createElement(
+                            'span',
+                            { className: 'ae-container-dropdown-selected-item' },
+                            this.props.selectedTarget
+                        ),
+                        React.createElement('span', { className: 'ae-icon-arrow' })
+                    )
+                ),
+                buttonTargetsList
+            );
+        },
+
+        /**
+         * Lifecycle. Invoked before rendering when new props or state are being received.
+         * This method is not called for the initial render or when forceUpdate is used.
+         *
+         * @method  shouldComponentUpdate
+         * @return {Boolean} Returns false when the transition to the new props and state will not
+         * require a component update.
+         */
+        shouldComponentUpdate: function shouldComponentUpdate(nextProps, nextState) {
+            return nextProps.expanded !== this.props.expanded || nextProps.selectedTarget !== this.props.selectedTarget;
+        }
+    });
+
+    AlloyEditor.Buttons[ButtonLinkTargetEdit.key] = AlloyEditor.ButtonLinkTargetEdit = ButtonLinkTargetEdit;
+})();
+'use strict';
+
+(function () {
+    'use strict';
+
+    /**
      * The ButtonLink class provides functionality for creating and editing a link in a document. ButtonLink
      * renders in two different modes:
      *
      * - Normal: Just a button that allows to switch to the edition mode
      * - Exclusive: The ButtonLinkEdit UI with all the link edition controls.
      *
+     * @uses ButtonKeystroke
      * @uses ButtonStateClasses
+     * @uses ButtonCfgProps
      *
      * @class ButtonLink
      */
+
     var ButtonLink = React.createClass({
         displayName: 'ButtonLink',
 
-        mixins: [AlloyEditor.ButtonStateClasses],
+        mixins: [AlloyEditor.ButtonKeystroke, AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonCfgProps],
 
         // Allows validating props being passed to the component.
         propTypes: {
@@ -7261,6 +10267,21 @@ CKEDITOR.tools.buildTableMap = function (table) {
         },
 
         /**
+         * Lifecycle. Returns the default values of the properties used in the widget.
+         *
+         * @method getDefaultProps
+         * @return {Object} The default properties.
+         */
+        getDefaultProps: function getDefaultProps() {
+            return {
+                keystroke: {
+                    fn: '_requestExclusive',
+                    keys: CKEDITOR.CTRL + 76 /*L*/
+                }
+            };
+        },
+
+        /**
          * Checks if the current selection is contained within a link.
          *
          * @method isActive
@@ -7280,14 +10301,26 @@ CKEDITOR.tools.buildTableMap = function (table) {
             var cssClass = 'ae-button ' + this.getStateClasses();
 
             if (this.props.renderExclusive) {
-                return React.createElement(AlloyEditor.ButtonLinkEdit, this.props);
+                var props = this.mergeButtonCfgProps();
+
+                return React.createElement(AlloyEditor.ButtonLinkEdit, props);
             } else {
                 return React.createElement(
                     'button',
-                    { 'aria-label': AlloyEditor.Strings.link, className: cssClass, 'data-type': 'button-link', onClick: this.props.requestExclusive.bind(ButtonLink.key), tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.link },
+                    { 'aria-label': AlloyEditor.Strings.link, className: cssClass, 'data-type': 'button-link', onClick: this._requestExclusive, tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.link },
                     React.createElement('span', { className: 'ae-icon-link' })
                 );
             }
+        },
+
+        /**
+         * Requests the link button to be rendered in exclusive mode to allow the creation of a link.
+         *
+         * @protected
+         * @method _requestExclusive
+         */
+        _requestExclusive: function _requestExclusive() {
+            this.props.requestExclusive(ButtonLink.key);
         }
     });
 
@@ -7307,6 +10340,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonOrderedList
      */
+
     var ButtonOrderedList = React.createClass({
         displayName: 'ButtonOrderedList',
 
@@ -7389,18 +10423,108 @@ CKEDITOR.tools.buildTableMap = function (table) {
     'use strict';
 
     /**
+        * The ButtonOutdentBlock class provides functionality for outdenting blocks.
+        *
+        * @uses ButtonCommand
+        * @uses ButtonCommandActive
+        * @uses ButtonStateClasses
+        *
+        * @class ButtonOutdentBlock
+        */
+
+    var ButtonOutdentBlock = React.createClass({
+        displayName: 'ButtonOutdentBlock',
+
+        mixins: [AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonCommand, AlloyEditor.ButtonCommandActive],
+
+        //Allows validating props being passed to the component
+        propTypes: {
+            /**
+                  * The editor instance where the component is being used.
+                  *
+                  * @property {Object} editor
+                  */
+            editor: React.PropTypes.object.isRequired,
+
+            /**
+             * The label that should be used for accessibility purposes.
+             *
+             * @property {String} label
+             */
+            label: React.PropTypes.string,
+
+            /**
+             * The tabIndex of the button in its toolbar current state. A value other than -1
+             * means that the button has focus and is the active element.
+             *
+             * @property {Number} tabIndex
+             */
+            tabIndex: React.PropTypes.number
+        },
+
+        // Lifecycle. Provides static properties to the widget.
+        statics: {
+            /**
+                  * The name which will be used as an alias of the button in the configuration.
+                  *
+                  * @static
+                  * @property {String} key
+                  * @default indentBlock
+                  */
+            key: 'outdentBlock'
+        },
+
+        /**
+           * Lifecycle. Returns the default values of the properties used in the widget.
+           *
+           * @method getDefaultProps
+           * @return {Object} The default properties.
+           */
+        getDefaultProps: function getDefaultProps() {
+            return {
+                command: 'outdent'
+            };
+        },
+
+        /**
+         * Lifecycle. Renders the UI of the button.
+         *
+         * @method render
+         * @return {Object} The content which should be rendered.
+         */
+        render: function render() {
+            var cssClass = 'ae-button ' + this.getStateClasses();
+
+            return React.createElement(
+                'button',
+                { 'aria-label': AlloyEditor.Strings.outdent, 'aria-pressed': cssClass.indexOf('pressed') !== -1, className: cssClass, 'data-type': 'button-outdent-block', onClick: this.execCommand, tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.outdent },
+                React.createElement('span', { className: 'ae-icon-outdent-block' })
+            );
+        }
+
+    });
+
+    AlloyEditor.Buttons[ButtonOutdentBlock.key] = AlloyEditor.ButtonOutdentBlock = ButtonOutdentBlock;
+})();
+'use strict';
+
+(function () {
+    'use strict';
+
+    /**
      * The ButtonParagraphAlignLeft class provides functionality for aligning a paragraph on left.
      *
-     * @uses ButtonActionStyle
+     * @uses ButtonCommand
+     * @uses ButtonCommandActive
      * @uses ButtonStateClasses
-     * @uses ButtonStyle
      *
      * @class ButtonParagraphAlignLeft
      */
+
     var ButtonParagraphAlignLeft = React.createClass({
         displayName: 'ButtonParagraphAlignLeft',
 
-        mixins: [AlloyEditor.ButtonStyle, AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonActionStyle],
+        mixins: [AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonCommand, AlloyEditor.ButtonCommandActive],
 
         // Allows validating props being passed to the component.
         propTypes: {
@@ -7447,12 +10571,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          */
         getDefaultProps: function getDefaultProps() {
             return {
-                style: {
-                    element: 'p',
-                    styles: {
-                        'text-align': 'left'
-                    }
-                }
+                command: 'justifyleft'
             };
         },
 
@@ -7467,7 +10586,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
 
             return React.createElement(
                 'button',
-                { 'aria-label': AlloyEditor.Strings.alignLeft, 'aria-pressed': cssClass.indexOf('pressed') !== -1, className: cssClass, 'data-type': 'button-paragraph-align-left', onClick: this.applyStyle, tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.alignLeft },
+                { 'aria-label': AlloyEditor.Strings.alignLeft, 'aria-pressed': cssClass.indexOf('pressed') !== -1, className: cssClass, 'data-type': 'button-paragraph-align-left', onClick: this.execCommand, tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.alignLeft },
                 React.createElement('span', { className: 'ae-icon-align-left' })
             );
         }
@@ -7483,16 +10602,17 @@ CKEDITOR.tools.buildTableMap = function (table) {
     /**
      * The ButtonParagraphAlignRight class provides functionality for aligning a paragraph on right.
      *
-     * @uses ButtonActionStyle
+     * @uses ButtonCommand
+     * @uses ButtonCommandActive
      * @uses ButtonStateClasses
-     * @uses ButtonStyle
      *
      * @class ButtonParagraphAlignRight
      */
+
     var ButtonParagraphAlignRight = React.createClass({
         displayName: 'ButtonParagraphAlignRight',
 
-        mixins: [AlloyEditor.ButtonStyle, AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonActionStyle],
+        mixins: [AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonCommand, AlloyEditor.ButtonCommandActive],
 
         // Allows validating props being passed to the component.
         propTypes: {
@@ -7539,12 +10659,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          */
         getDefaultProps: function getDefaultProps() {
             return {
-                style: {
-                    element: 'p',
-                    styles: {
-                        'text-align': 'right'
-                    }
-                }
+                command: 'justifyright'
             };
         },
 
@@ -7559,7 +10674,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
 
             return React.createElement(
                 'button',
-                { 'aria-label': AlloyEditor.Strings.alignRight, 'aria-pressed': cssClass.indexOf('pressed') !== -1, className: cssClass, 'data-type': 'button-paragraph-align-right', onClick: this.applyStyle, tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.alignRight },
+                { 'aria-label': AlloyEditor.Strings.alignRight, 'aria-pressed': cssClass.indexOf('pressed') !== -1, className: cssClass, 'data-type': 'button-paragraph-align-right', onClick: this.execCommand, tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.alignRight },
                 React.createElement('span', { className: 'ae-icon-align-right' })
             );
         }
@@ -7575,16 +10690,17 @@ CKEDITOR.tools.buildTableMap = function (table) {
     /**
      * The ButtonParagraphCenter class provides functionality for centering a paragraph.
      *
-     * @uses ButtonActionStyle
+     * @uses ButtonCommand
+     * @uses ButtonCommandActive
      * @uses ButtonStateClasses
-     * @uses ButtonStyle
      *
      * @class ButtonParagraphCenter
      */
+
     var ButtonParagraphCenter = React.createClass({
         displayName: 'ButtonParagraphCenter',
 
-        mixins: [AlloyEditor.ButtonStyle, AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonActionStyle],
+        mixins: [AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonCommand, AlloyEditor.ButtonCommandActive],
 
         // Allows validating props being passed to the component.
         propTypes: {
@@ -7631,12 +10747,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          */
         getDefaultProps: function getDefaultProps() {
             return {
-                style: {
-                    element: 'p',
-                    styles: {
-                        'text-align': 'center'
-                    }
-                }
+                command: 'justifycenter'
             };
         },
 
@@ -7651,7 +10762,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
 
             return React.createElement(
                 'button',
-                { 'aria-label': AlloyEditor.Strings.alignCenter, 'aria-pressed': cssClass.indexOf('pressed') !== -1, className: cssClass, 'data-type': 'button-paragraph-center', onClick: this.applyStyle, tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.alignCenter },
+                { 'aria-label': AlloyEditor.Strings.alignCenter, 'aria-pressed': cssClass.indexOf('pressed') !== -1, className: cssClass, 'data-type': 'button-paragraph-center', onClick: this.execCommand, tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.alignCenter },
                 React.createElement('span', { className: 'ae-icon-align-center' })
             );
         }
@@ -7667,16 +10778,17 @@ CKEDITOR.tools.buildTableMap = function (table) {
     /**
      * The ButtonParagraphJustify class provides functionality for justfying a paragraph.
      *
-     * @uses ButtonActionStyle
+     * @uses ButtonCommand
+     * @uses ButtonCommandActive
      * @uses ButtonStateClasses
-     * @uses ButtonStyle
      *
      * @class ButtonParagraphJustify
      */
+
     var ButtonParagraphJustify = React.createClass({
         displayName: 'ButtonParagraphJustify',
 
-        mixins: [AlloyEditor.ButtonStyle, AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonActionStyle],
+        mixins: [AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonCommand, AlloyEditor.ButtonCommandActive],
 
         // Allows validating props being passed to the component.
         propTypes: {
@@ -7723,12 +10835,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          */
         getDefaultProps: function getDefaultProps() {
             return {
-                style: {
-                    element: 'p',
-                    styles: {
-                        'text-align': 'justify'
-                    }
-                }
+                command: 'justifyblock'
             };
         },
 
@@ -7743,7 +10850,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
 
             return React.createElement(
                 'button',
-                { 'aria-label': AlloyEditor.Strings.alignJustify, 'aria-pressed': cssClass.indexOf('pressed') !== -1, className: cssClass, 'data-type': 'button-paragraph-justify', onClick: this.applyStyle, tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.alignJustify },
+                { 'aria-label': AlloyEditor.Strings.alignJustify, 'aria-pressed': cssClass.indexOf('pressed') !== -1, className: cssClass, 'data-type': 'button-paragraph-justify', onClick: this.execCommand, tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.alignJustify },
                 React.createElement('span', { className: 'ae-icon-align-justified' })
             );
         }
@@ -7765,6 +10872,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonQuote
      */
+
     var ButtonQuote = React.createClass({
         displayName: 'ButtonQuote',
 
@@ -7853,6 +10961,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonRemoveFormat
      */
+
     var ButtonRemoveFormat = React.createClass({
         displayName: 'ButtonRemoveFormat',
 
@@ -7938,6 +11047,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonStrike
      */
+
     var ButtonStrike = React.createClass({
         displayName: 'ButtonStrike',
 
@@ -7989,9 +11099,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
         getDefaultProps: function getDefaultProps() {
             return {
                 command: 'strike',
-                style: {
-                    element: 's'
-                }
+                style: 'coreStyles_strike'
             };
         },
 
@@ -8017,13 +11125,14 @@ CKEDITOR.tools.buildTableMap = function (table) {
 "use strict";
 
 (function () {
-    "use strict";
+    'use strict';
 
     /**
      * The ButtonsStylesListHeader class provides the header of an list of style items.
      *
      * @class ButtonsStylesListHeader
      */
+
     var ButtonsStylesListHeader = React.createClass({
         displayName: "ButtonsStylesListHeader",
 
@@ -8059,6 +11168,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonStylesListItemRemove
      */
+
     var ButtonStylesListItemRemove = React.createClass({
         displayName: 'ButtonStylesListItemRemove',
 
@@ -8174,6 +11284,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonStylesListItem
      */
+
     var ButtonStylesListItem = React.createClass({
         displayName: 'ButtonStylesListItem',
 
@@ -8254,6 +11365,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonStylesList
      */
+
     var ButtonStylesList = React.createClass({
         displayName: 'ButtonStylesList',
 
@@ -8279,7 +11391,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @method componentDidMount
          */
         componentDidMount: function componentDidMount() {
-            React.findDOMNode(this).focus();
+            ReactDOM.findDOMNode(this).focus();
         },
 
         /**
@@ -8325,7 +11437,8 @@ CKEDITOR.tools.buildTableMap = function (table) {
                     dismissPrev: [37],
                     next: [40],
                     prev: [38]
-                }
+                },
+                showRemoveStylesItem: true
             };
         },
 
@@ -8336,13 +11449,19 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @return {Object} The content which should be rendered.
          */
         render: function render() {
+            var removeStylesItem;
+
+            if (this.props.showRemoveStylesItem) {
+                removeStylesItem = React.createElement(AlloyEditor.ButtonStylesListItemRemove, { editor: this.props.editor, onDismiss: this.props.toggleDropdown });
+            }
+
             return React.createElement(
                 'div',
                 { className: 'ae-dropdown ae-arrow-box ae-arrow-box-top-left', onFocus: this.focus, onKeyDown: this.handleKey, tabIndex: '0' },
                 React.createElement(
                     'ul',
                     { className: 'ae-listbox', role: 'listbox' },
-                    React.createElement(AlloyEditor.ButtonStylesListItemRemove, { editor: this.props.editor }),
+                    removeStylesItem,
                     React.createElement(AlloyEditor.ButtonsStylesListHeader, { name: AlloyEditor.Strings.blockStyles, styles: this._blockStyles }),
                     this._renderStylesItems(this._blockStyles),
                     React.createElement(AlloyEditor.ButtonsStylesListHeader, { name: AlloyEditor.Strings.inlineStyles, styles: this._inlineStyles }),
@@ -8393,6 +11512,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonStyles
      */
+
     var ButtonStyles = React.createClass({
         displayName: 'ButtonStyles',
 
@@ -8418,6 +11538,13 @@ CKEDITOR.tools.buildTableMap = function (table) {
              * @property {String} label
              */
             label: React.PropTypes.string,
+
+            /**
+             * Indicates whether the remove styles item should appear in the styles list.
+             *
+             * @property {Boolean} expanded
+             */
+            showRemoveStylesItem: React.PropTypes.bool,
 
             /**
              * List of the styles the button is able to handle.
@@ -8465,16 +11592,16 @@ CKEDITOR.tools.buildTableMap = function (table) {
 
             var styles = this._getStyles();
 
-            styles.forEach((function (item) {
+            styles.forEach(function (item) {
                 if (this._checkActive(item.style)) {
                     activeStyle = item.name;
                 }
-            }).bind(this));
+            }.bind(this));
 
             var buttonStylesList;
 
             if (this.props.expanded) {
-                buttonStylesList = React.createElement(AlloyEditor.ButtonStylesList, { editor: this.props.editor, onDismiss: this.props.toggleDropdown, styles: styles });
+                buttonStylesList = React.createElement(AlloyEditor.ButtonStylesList, { editor: this.props.editor, onDismiss: this.props.toggleDropdown, showRemoveStylesItem: this.props.showRemoveStylesItem, styles: styles });
             }
 
             return React.createElement(
@@ -8574,6 +11701,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonSubscript
      */
+
     var ButtonSubscript = React.createClass({
         displayName: 'ButtonSubscript',
 
@@ -8625,9 +11753,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
         getDefaultProps: function getDefaultProps() {
             return {
                 command: 'subscript',
-                style: {
-                    element: 'sub'
-                }
+                style: 'coreStyles_subscript'
             };
         },
 
@@ -8664,6 +11790,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonSuperscript
      */
+
     var ButtonSuperscript = React.createClass({
         displayName: 'ButtonSuperscript',
 
@@ -8715,9 +11842,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
         getDefaultProps: function getDefaultProps() {
             return {
                 command: 'superscript',
-                style: {
-                    element: 'sup'
-                }
+                style: 'coreStyles_superscript'
             };
         },
 
@@ -8750,6 +11875,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonTableCell
      */
+
     var ButtonTableCell = React.createClass({
         displayName: 'ButtonTableCell',
 
@@ -8886,6 +12012,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonTableColumn
      */
+
     var ButtonTableColumn = React.createClass({
         displayName: 'ButtonTableColumn',
 
@@ -9068,7 +12195,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @method componentDidMount
          */
         componentDidMount: function componentDidMount() {
-            React.findDOMNode(this.refs.rows).focus();
+            ReactDOM.findDOMNode(this.refs.rows).focus();
         },
 
         /**
@@ -9195,6 +12322,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonTableHeading
      */
+
     var ButtonTableHeading = React.createClass({
         displayName: 'ButtonTableHeading',
 
@@ -9338,6 +12466,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonTableRemove
      */
+
     var ButtonTableRemove = React.createClass({
         displayName: 'ButtonTableRemove',
 
@@ -9388,7 +12517,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
             return React.createElement(
                 'button',
                 { 'aria-label': AlloyEditor.Strings.deleteTable, className: 'ae-button', 'data-type': 'button-table-remove', onClick: this._removeTable, tabIndex: this.props.tabIndex, title: AlloyEditor.Strings.deleteTable },
-                React.createElement('span', { className: 'ae-icon-close' })
+                React.createElement('span', { className: 'ae-icon-bin' })
             );
         },
 
@@ -9420,6 +12549,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonTableRow
      */
+
     var ButtonTableRow = React.createClass({
         displayName: 'ButtonTableRow',
 
@@ -9545,6 +12675,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonTable
      */
+
     var ButtonTable = React.createClass({
         displayName: 'ButtonTable',
 
@@ -9612,6 +12743,147 @@ CKEDITOR.tools.buildTableMap = function (table) {
     'use strict';
 
     /**
+     * The ButtonTargetList class provides functionality for changing the target of a link
+     * in the document.
+     *
+     * @uses WidgetFocusManager
+     *
+     * @class ButtonTargetList
+     */
+
+    var ButtonTargetList = React.createClass({
+        displayName: 'ButtonTargetList',
+
+        mixins: [AlloyEditor.WidgetFocusManager],
+
+        // Allows validating props being passed to the component.
+        propTypes: {
+            /**
+             * The editor instance where the component is being used.
+             *
+             * @property {Object} editor
+             */
+            editor: React.PropTypes.object.isRequired
+        },
+
+        // Lifecycle. Provides static properties to the widget.
+        statics: {
+            /**
+             * The name which will be used as an alias of the button in the configuration.
+             *
+             * @static
+             * @property {String} key
+             * @default linkTargetEdit
+             */
+            key: 'targetList'
+        },
+
+        /**
+         * Lifecycle. Invoked once, only on the client, immediately after the initial rendering occurs.
+         *
+         * @method componentDidMount
+         */
+        componentDidMount: function componentDidMount() {
+            ReactDOM.findDOMNode(this).focus();
+        },
+
+        /**
+         * Lifecycle. Returns the default values of the properties used in the widget.
+         *
+         * @method getDefaultProps
+         */
+        getDefaultProps: function getDefaultProps() {
+            return {
+                circular: true,
+                descendants: '.ae-toolbar-element',
+                keys: {
+                    dismiss: [27],
+                    dismissNext: [39],
+                    dismissPrev: [37],
+                    next: [40],
+                    prev: [38]
+                }
+            };
+        },
+
+        /**
+         * Lifecycle. Renders the UI of the button.
+         *
+         * @method render
+         * @return {Object} The content which should be rendered.
+         */
+        render: function render() {
+            var listTargets = this._renderListTargets();
+
+            return React.createElement(
+                AlloyEditor.ButtonDropdown,
+                this.props,
+                listTargets
+            );
+        },
+
+        /**
+         * Returns the the allowed link target items.
+         *
+         * @protected
+         * @method _getAllowedTargetItems
+         *
+         * @return {Array} The allowed target items.
+         */
+        _getAllowedTargetItems: function _getAllowedTargetItems() {
+            return this.props.allowedLinkTargets || [{
+                label: AlloyEditor.Strings.linkTargetDefault,
+                value: ''
+            }, {
+                label: AlloyEditor.Strings.linkTargetSelf,
+                value: '_self'
+            }, {
+                label: AlloyEditor.Strings.linkTargetBlank,
+                value: '_blank'
+            }, {
+                label: AlloyEditor.Strings.linkTargetParent,
+                value: '_parent'
+            }, {
+                label: AlloyEditor.Strings.linkTargetTop,
+                value: '_top'
+            }];
+        },
+
+        /**
+         * Renders the allowed link target items.
+         *
+         * @method _renderListTargets
+         * @return {Object} Returns the rendered link items
+         */
+        _renderListTargets: function _renderListTargets() {
+            var targets = this._getAllowedTargetItems();
+
+            var handleLinkTargetChange = this.props.handleLinkTargetChange;
+
+            targets = targets.map(function (target) {
+                return React.createElement(
+                    'li',
+                    { key: target.value, role: 'option' },
+                    React.createElement(
+                        'button',
+                        { className: 'ae-toolbar-element', 'data-value': target.value, onClick: handleLinkTargetChange },
+                        target.label
+                    )
+                );
+            });
+
+            return targets;
+        }
+    });
+
+    AlloyEditor.Buttons[ButtonTargetList.key] = AlloyEditor.ButtonTargetList = ButtonTargetList;
+})();
+'use strict';
+
+(function () {
+    'use strict';
+
+    /**
      * The ButtonTwitter class provides functionality for creating a link which
      * allows people to tweet part of the content in the editor.
      *
@@ -9619,6 +12891,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonTwitter
      */
+
     var ButtonTwitter = React.createClass({
         displayName: 'ButtonTwitter',
 
@@ -9754,6 +13027,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ButtonUnorderedlist
      */
+
     var ButtonUnorderedlist = React.createClass({
         displayName: 'ButtonUnorderedlist',
 
@@ -9839,15 +13113,17 @@ CKEDITOR.tools.buildTableMap = function (table) {
      * The ButtonUnderline class provides functionality for underlying a text selection.
      *
      * @uses ButtonCommand
+     * @uses ButtonKeystroke
      * @uses ButtonStateClasses
      * @uses ButtonStyle
      *
      * @class ButtonUnderline
      */
+
     var ButtonUnderline = React.createClass({
         displayName: 'ButtonUnderline',
 
-        mixins: [AlloyEditor.ButtonStyle, AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonCommand],
+        mixins: [AlloyEditor.ButtonStyle, AlloyEditor.ButtonStateClasses, AlloyEditor.ButtonCommand, AlloyEditor.ButtonKeystroke],
 
         // Allows validating props being passed to the component.
         propTypes: {
@@ -9895,9 +13171,11 @@ CKEDITOR.tools.buildTableMap = function (table) {
         getDefaultProps: function getDefaultProps() {
             return {
                 command: 'underline',
-                style: {
-                    element: 'u'
-                }
+                keystroke: {
+                    fn: 'execCommand',
+                    keys: CKEDITOR.CTRL + 85 /*U*/
+                },
+                style: 'coreStyles_underline'
             };
         },
 
@@ -9924,6 +13202,9 @@ CKEDITOR.tools.buildTableMap = function (table) {
 
 (function () {
     'use strict';
+
+    var POSITION_LEFT = 1;
+    var POSITION_RIGHT = 2;
 
     /**
      * The ToolbarAdd class provides functionality for adding content to the editor.
@@ -9987,6 +13268,15 @@ CKEDITOR.tools.buildTableMap = function (table) {
             onDismiss: React.PropTypes.func,
 
             /**
+             * Whether the Toolbar should be shown on left or on right of the editable area. Could be one of these:
+             * - ToolbarAdd.left
+             * - ToolbarAdd.right
+             *
+             * @property {Enum} position
+             */
+            position: React.PropTypes.oneOf([POSITION_LEFT, POSITION_RIGHT]),
+
+            /**
              * The data, returned from {{#crossLink "CKEDITOR.plugins.selectionregion/getSelectionData:method"}}{{/crossLink}}
              *
              * @property {Object} selectionData
@@ -10003,7 +13293,25 @@ CKEDITOR.tools.buildTableMap = function (table) {
              * @property {String} key
              * @default add
              */
-            key: 'add'
+            key: 'add',
+
+            /**
+             * Defines the constant for positioning the Toolbar on left of the editable area.
+             *
+             * @static
+             * @property {String} left
+             * @default 1
+             */
+            left: POSITION_LEFT,
+
+            /**
+             * Defines the constant for positioning the Toolbar on right of the editable area.
+             *
+             * @static
+             * @property {String} right
+             * @default 2
+             */
+            right: POSITION_RIGHT
         },
 
         /**
@@ -10024,7 +13332,8 @@ CKEDITOR.tools.buildTableMap = function (table) {
                     dismiss: [27],
                     next: [39, 40],
                     prev: [37, 38]
-                }
+                },
+                position: POSITION_LEFT
             };
         },
 
@@ -10064,7 +13373,14 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @return {Object|null} The content which should be rendered.
          */
         render: function render() {
-            if (this.props.editorEvent && !this.props.editorEvent.data.nativeEvent.target.isContentEditable) {
+            // Some operations such as `requestExclusive` may force editor to blur which will
+            // invalidate the `props.editorEvent` stored value, without causing a `props` change.
+            // For example, if the editor is empty, `ae_placeholder` plugin will remove
+            // the target from the DOM and will prevent `add` toolbar from rendering.
+            //
+            // It should be safe to assume that if you have been able to render the toolbar
+            // and request the exclusive mode, then rendering might be kept until the exclusive mode is left.
+            if (!this.state.itemExclusive && this.props.editorEvent && this.props.editorEvent.data.nativeEvent.target && !this.props.editorEvent.data.nativeEvent.target.isContentEditable) {
                 return null;
             }
 
@@ -10131,30 +13447,40 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @method _updatePosition
          */
         _updatePosition: function _updatePosition() {
+            var region;
+
             // If component is not mounted, there is nothing to do
-            if (!React.findDOMNode(this)) {
+            if (!ReactDOM.findDOMNode(this)) {
                 return;
             }
 
             if (this.props.renderExclusive) {
                 this.updatePosition();
                 this.show();
-
-                var region;
             } else {
                 if (this.props.selectionData) {
                     region = this.props.selectionData.region;
                 }
 
                 if (region) {
-                    var domNode = React.findDOMNode(this);
+                    var domNode = ReactDOM.findDOMNode(this);
                     var domElement = new CKEDITOR.dom.element(domNode);
 
                     var startRect = region.startRect || region;
-                    var left = this.props.editor.get('nativeEditor').editable().getClientRect().left;
+                    var clientRect = this.props.editor.get('nativeEditor').editable().getClientRect();
 
-                    domNode.style.left = left - domNode.offsetWidth - this.props.gutterExclusive.left + 'px';
-                    domNode.style.top = region.top - domNode.offsetHeight / 2 + startRect.height / 2 + 'px';
+                    var offsetLeft;
+
+                    var position = this.props.config.position || this.props.position;
+
+                    if (position === POSITION_LEFT) {
+                        offsetLeft = clientRect.left - domNode.offsetWidth - this.props.gutterExclusive.left + 'px';
+                    } else {
+                        offsetLeft = clientRect.right + this.props.gutterExclusive.left + 'px';
+                    }
+
+                    domNode.style.left = offsetLeft;
+                    domNode.style.top = Math.floor(region.top - domNode.offsetHeight / 2 + startRect.height / 2) + 'px';
                     domNode.style.opacity = 1;
 
                     domElement.removeClass('ae-arrow-box');
@@ -10184,6 +13510,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class ToolbarStyles
      */
+
     var ToolbarStyles = React.createClass({
         displayName: 'ToolbarStyles',
 
@@ -10227,7 +13554,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
             onDismiss: React.PropTypes.func,
 
             /**
-             * The data, returned from {{#crossLink "CKEDITOR.plugins.selectionregion/getSelectionData:method"}}{{/crossLink}}
+             * The data, returned from {{#crossLink "CKEDITOR.plugins.ae_selectionregion/getSelectionData:method"}}{{/crossLink}}
              *
              * @property {Object} selectionData
              */
@@ -10277,7 +13604,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
         getDefaultProps: function getDefaultProps() {
             return {
                 circular: true,
-                descendants: '.ae-button, .ae-toolbar-element',
+                descendants: '.ae-input, .ae-button:not([disabled]), .ae-toolbar-element',
                 keys: {
                     dismiss: [27],
                     next: [39, 40],
@@ -10294,10 +13621,6 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @return {Object|null} The content which should be rendered.
          */
         render: function render() {
-            if (this.props.editorEvent && !this.props.editorEvent.data.nativeEvent.target.isContentEditable) {
-                return null;
-            }
-
             var currentSelection = this._getCurrentSelection();
 
             if (currentSelection) {
@@ -10313,6 +13636,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
                 var cssClasses = 'ae-toolbar-styles ' + arrowBoxClasses;
 
                 var buttons = this.getToolbarButtons(currentSelection.buttons, {
+                    manualSelection: this.props.editorEvent ? this.props.editorEvent.data.manualSelection : null,
                     selectionType: currentSelection.name
                 });
 
@@ -10380,7 +13704,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
                     var result;
 
                     if (testFn) {
-                        result = testFn({
+                        result = eventPayload.manualSelection === item.name || testFn({
                             data: eventPayload,
                             editor: this.props.editor
                         });
@@ -10405,7 +13729,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          */
         _updatePosition: function _updatePosition() {
             // If component is not mounted, there is nothing to do
-            if (!React.findDOMNode(this)) {
+            if (!ReactDOM.findDOMNode(this)) {
                 return;
             }
 
@@ -10448,6 +13772,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
      *
      * @class UI
      */
+
     var UI = React.createClass({
         displayName: 'UI',
 
@@ -10535,34 +13860,42 @@ CKEDITOR.tools.buildTableMap = function (table) {
             // It is not easy to debounce _setUIHidden on mousedown, because if we
             // debounce it, when the handler is being invoked, the target might be no more part
             // of the editor's UI - onActionPerformed causes re-render.
-            this._mousedownListener = (function (event) {
+            this._mousedownListener = function (event) {
                 this._setUIHidden(event.target);
-            }).bind(this);
+            }.bind(this);
 
             this._keyDownListener = CKEDITOR.tools.debounce(function (event) {
                 this._setUIHidden(document.activeElement);
             }, this.props.eventsDelay, this);
 
-            editor.once('contentDom', (function () {
-                document.addEventListener('mousedown', this._mousedownListener);
-                document.addEventListener('keydown', this._keyDownListener);
-            }).bind(this));
+            document.addEventListener('mousedown', this._mousedownListener);
+            document.addEventListener('keydown', this._keyDownListener);
         },
 
         /**
          * Lifecycle. Invoked immediately after the component's updates are flushed to the DOM.
-         * Fires 'ariaUpdate' event passing ARIA related messages.
+         * Fires `ariaUpdate` event passing ARIA related messages.
+         * Fires `editorUpdate` event passing the previous and current properties and state.
          *
          * @method componentDidUpdate
          */
         componentDidUpdate: function componentDidUpdate(prevProps, prevState) {
-            var domNode = React.findDOMNode(this);
+            var domNode = ReactDOM.findDOMNode(this);
+
+            var editor = this.props.editor.get('nativeEditor');
 
             if (domNode) {
-                this.props.editor.get('nativeEditor').fire('ariaUpdate', {
+                editor.fire('ariaUpdate', {
                     message: this._getAvailableToolbarsMessage(domNode)
                 });
             }
+
+            editor.fire('editorUpdate', {
+                prevProps: prevProps,
+                prevState: prevState,
+                props: this.props,
+                state: this.state
+            });
         },
 
         _getAriaUpdateTemplate: function _getAriaUpdateTemplate(ariaUpdate) {
@@ -10655,7 +13988,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
                 return AlloyEditor.Toolbars[toolbar] || window[toolbar];
             });
 
-            toolbars = this.filterExclusive(toolbars).map((function (toolbar) {
+            toolbars = this.filterExclusive(toolbars).map(function (toolbar) {
                 var props = this.mergeExclusiveProps({
                     config: this.props.toolbars[toolbar.key],
                     editor: this.props.editor,
@@ -10666,7 +13999,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
                 }, toolbar.key);
 
                 return React.createElement(toolbar, props);
-            }).bind(this));
+            }.bind(this));
 
             return React.createElement(
                 'div',
@@ -10745,7 +14078,7 @@ CKEDITOR.tools.buildTableMap = function (table) {
          * @param {DOMElement} target The DOM element with which user interacted lastly.
          */
         _setUIHidden: function _setUIHidden(target) {
-            var domNode = React.findDOMNode(this);
+            var domNode = ReactDOM.findDOMNode(this);
 
             if (domNode) {
                 var editable = this.props.editor.get('nativeEditor').editable();
@@ -10762,6 +14095,25 @@ CKEDITOR.tools.buildTableMap = function (table) {
         }
     });
 
+    /**
+     * Fired when component updates and when it is rendered in the DOM.
+     * The payload consists from a `message` property containing the ARIA message.
+     *
+     * @event ariaUpdate
+     */
+
+    /**
+     * Fired when component updates. The payload consists from an object with the following
+     * properties:
+     * - prevProps - The previous properties of the component
+     * - prevState - The previous state of the component
+     * - props - The current properties of the component
+     * - state - The current state of the component
+     *
+     * @event ariaUpdate
+     */
+
     AlloyEditor.UI = UI;
 })();
+    }
 }());
